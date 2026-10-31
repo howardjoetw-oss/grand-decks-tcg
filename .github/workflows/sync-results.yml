@@ -1,1 +1,44 @@
 
+name: Sync ONE PIECE tournament results (free API)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 18 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate parser tests
+        run: python -m unittest discover -s scripts -p test_imports.py
+
+      - name: Import public tournament results
+        run: python scripts/sync_results.py --days 45 --max-events 32
+
+      - name: Check topdecks public rows
+        run: |
+          pip install --disable-pip-version-check beautifulsoup4
+          python scripts/import_topdecks.py
+
+      - name: Commit if results changed
+        run: |
+          if ! git diff --quiet -- public/data/decks.json; then
+            git config user.name "grand-decks-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public/data/decks.json
+            git commit -m "chore: refresh public tournament results"
+            git push
+          fi
+
