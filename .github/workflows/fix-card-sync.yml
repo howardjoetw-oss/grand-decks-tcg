@@ -1,1 +1,45 @@
 
+name: Fix GRAND DECKS card synchronization
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Correct card source paths
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('public/app.js')
+          s = p.read_text(encoding='utf-8')
+          changes = [
+              ('if(!Array.isArray(packs)||packs.length===0)', 'const packList=Array.isArray(packs)?packs:Object.values(packs||{});if(packList.length===0)'),
+              ('const items=packs.map(', 'const items=packList.map('),
+              ('${DATA_URL}/cards/${encodeURIComponent(id)}.json', '${DATA_URL}/data/${encodeURIComponent(id)}.json'),
+          ]
+          for before, after in changes:
+              if before in s:
+                  s = s.replace(before, after, 1)
+              elif after not in s:
+                  raise RuntimeError('Expected code not found')
+          p.write_text(s, encoding='utf-8')
+          PY
+          node --check public/app.js
+
+      - name: Save the fix to GitHub
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: repair card database synchronization'
+            git push
+          fi
+
