@@ -1,4 +1,5 @@
 /* GRAND DECKS: Original, zero-dependency PWA front-end. No paid API keys. */
+/* HOTFIX 2026-10-31: Punk Records uses packs keyed object and per-pack JSON under data/. */
 'use strict';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -34,8 +35,8 @@ function cardColor(card){const c=card.colors?.[0];return COLORS[c]?.[1]||'#b9a47
 function dots(card){return (card.colors||[]).map(c=>`<span class="dot" title="${COLORS[c]?.[0]||safe(c)}" style="background:${COLORS[c]?.[1]||'#9aa'}"></span>`).join('');}
 function art(card){const name=safe(card.name);const img=card.image&&/^https:\/\//i.test(card.image)?`<img src="${safe(card.image)}" alt="${name}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:'';return `<div class="cardart"><span class="artText">${safe(card.demo?'DEMO':card.id)}</span>${img}</div>`;}
 function renderHome(){$('#metricCards').textContent=cards.length.toLocaleString('zh-TW');$('#metricDecks').textContent=decks.length;$('#metricStatus').textContent=dataKind==='demo'?'DEMO':dataKind==='sync'?'SYNC':'CUSTOM';$('#metricUpdate').textContent=dataKind==='demo'?'示範資料':updatedAt?`更新 ${updatedAt.slice(0,10)}`:'自訂資料';$('#dataBadge').textContent=dataKind==='demo'?'示範資料':dataKind==='sync'?'繁中卡池':'自訂卡池';}
-function updateSetFilter(){const e=$('#setFilter'),prev=e.value;const all=[...new Set(cards.map(c=>c.pack_id).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));e.innerHTML='<option value="">全部系列</option>'+all.map(s=>`<option value="${safe(s)}">${safe(s)}</option>`).join('');if(all.includes(prev))e.value=prev;}
-function cardMatches(c){const q=$('#cardSearch').value.trim().toLowerCase();const color=$('#colorFilter').value,type=$('#typeFilter').value,set=$('#setFilter').value;return(!q||[c.name,c.id,c.effect,c.pack_id].some(v=>String(v||'').toLowerCase().includes(q)))&&(!color||c.colors.includes(color))&&(!type||c.category===type)&&(!set||c.pack_id===set);}
+function updateSetFilter(){const e=$('#setFilter'),prev=e.value;const all=[...new Set(cards.map(c=>c.id.split('-')[0].toUpperCase()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));e.innerHTML='<option value="">全部系列</option>'+all.map(s=>`<option value="${safe(s)}">${safe(s)}</option>`).join('');if(all.includes(prev))e.value=prev;}
+function cardMatches(c){const q=$('#cardSearch').value.trim().toLowerCase();const color=$('#colorFilter').value,type=$('#typeFilter').value,set=$('#setFilter').value;return(!q||[c.name,c.id,c.effect,c.pack_id].some(v=>String(v||'').toLowerCase().includes(q)))&&(!color||c.colors.includes(color))&&(!type||c.category===type)&&(!set||c.id.split('-')[0].toUpperCase()===set);}
 function renderCards(){const matched=cards.filter(cardMatches);$('#cardCount').textContent=`${matched.length.toLocaleString('zh-TW')} 張卡牌`;
  $('#cardGrid').innerHTML=matched.slice(0,shownCards).map(c=>`<button class="cardtile" data-card="${safe(c.id)}"><div class="coloredge" style="--edge:${cardColor(c)}"></div>${art(c)}<div class="cardmeta"><strong title="${safe(c.name)}">${safe(c.name)}</strong><small>${safe(c.id)} · ${safe(c.cost??c.category)}</small></div></button>`).join('')||'<div class="note">找不到符合條件的卡牌。</div>';
  $('#moreCards').hidden=matched.length<=shownCards;
