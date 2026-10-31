@@ -39,7 +39,7 @@ jobs:
             git config user.name 'grand-decks-bot'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             git add public/data
-            git commit -m 'chore: refresh sourced OPTCG dataset [skip ci]'
+            git commit -m 'chore: refresh sourced OPTCG dataset'
             git pull --rebase origin main
             git push origin HEAD:main
           else
