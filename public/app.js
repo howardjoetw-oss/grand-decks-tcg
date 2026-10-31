@@ -33,37 +33,71 @@ function toast(message){const el=$('#toast');el.textContent=message;el.classList
 function nav(page){if(!$('#page-'+page))return;currentPage=page;$$('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));window.scrollTo({top:0,behavior:'instant'});if(page==='home')renderHome();if(page==='cards')renderCards();if(page==='builder')renderBuilder();if(page==='decks')renderDecks();if(page==='data')renderData();if(page==='results'||page==='meta')window.renderResults?.(page);}
 function cardColor(card){const c=card.colors?.[0];return COLORS[c]?.[1]||'#b9a47b';}
 function dots(card){return (card.colors||[]).map(c=>`<span class="dot" title="${COLORS[c]?.[0]||safe(c)}" style="background:${COLORS[c]?.[1]||'#9aa'}"></span>`).join('');}
-function cardImageUrl(card){
-  if(!card||card.demo)return '';
-  if(/^https:\/\//i.test(card.image||''))return card.image;
-  // Fallback for previously published metadata snapshots that have no image field.
-  if(/^[A-Z0-9]{1,10}-\d{2,4}$/.test(card.id||''))
-    return 'https://asia-tw.onepiece-cardgame.com/images/cardlist/card/'+card.id+'.png';
-  return '';
+/* Card artwork fallback. Only public HTTPS image URLs; no downloading or copying art. */
+function cardImageCandidates(card){
+  if(!card||card.demo)return [];
+  const id=String(card.id||'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{1,10}-\d{2,4}$/.test(id))return [];
+  const hosts=[
+    'https://asia-tc.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
+    'https://en.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
+    'https://jp.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
+    'https://optcg-api.arjunbansal-ai.workers.dev/images/'+encodeURIComponent(id)
+  ];
+  const official=String(card.image||'').trim();
+  if(/^https:\/\/(?:asia-tw|asia-tc|en|jp)\.onepiece-cardgame\.com\/images\/cardlist\/card\/[a-z0-9_-]+\.png(?:\?[^#]*)?$/i.test(official)){
+    // Source image first; every domain is tried at most once per rendered image.
+    hosts.unshift(official);
+  }
+  return [...new Set(hosts)];
 }
-function cardMini(card, cls='miniCard'){
-  if(!card)return `<span class="${cls} noImage">?</span>`;
-  const title=safe(card.name||card.id), id=safe(card.id);
-  const url=safe(cardImageUrl(card));
-  return `<span class="${cls} ${url?'':'noImage'}">${url?`<img src="${url}" alt="${title}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:''}<small>${id}</small></span>`;
+window.grandImageFallback=function(img){
+  if(!img||!img.dataset||!img.dataset.grandArt)return;
+  let sources=[];try{sources=JSON.parse(img.dataset.grandArt);}catch{}
+  const next=(Number(img.dataset.grandArtIndex)||0)+1;
+  if(next<sources.length){img.dataset.grandArtIndex=String(next);img.src=sources[next];return;}
+  img.parentElement?.classList.add('artUnavailable');
+  img.remove(); // The card ID stays visible; never replace with an unrelated card.
+};
+window.grandImageLoaded=function(img){if(img?.parentElement)img.parentElement.classList.remove('artUnavailable');};
+function cardImageTag(card,classes=''){
+  const sources=cardImageCandidates(card);
+  if(!sources.length)return '';
+  const alt=safe(card.name||card.id);
+  return `<img ${classes?`class="${safe(classes)}"`:''} src="${safe(sources[0])}" data-grand-art="${safe(JSON.stringify(sources))}" data-grand-art-index="0" alt="${alt}" loading="lazy" decoding="async" onload="window.grandImageLoaded(this)" onerror="window.grandImageFallback(this)">`;
+}
+function cardMini(card,cls='miniCard'){
+  if(!card)return `<span class="${safe(cls)} noImage" aria-label="卡牌圖像未收錄">?</span>`;
+  const title=safe(card.name||card.id),id=safe(card.id);
+  const img=cardImageTag(card);
+  return `<span class="${safe(cls)} ${img?'':'noImage'}" title="${title} / ${id}">${img}<small>${id}</small></span>`;
 }
 window.grandCardInfo=id=>byId(id);
 window.grandCardMini=id=>{const c=byId(id);return cardMini(c||(/^[A-Z0-9]{1,10}-\d{2,4}$/.test(String(id))?{id:String(id),name:String(id),image:'',demo:false}:null));};
-function art(card){const name=safe(card.name);const imageUrl=cardImageUrl(card);const img=imageUrl?`<img src="${safe(imageUrl)}" alt="${name}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`:'';return `<div class="cardart"><span class="artText">${safe(card.demo?'DEMO':card.id)}</span>${img}</div>`;}
+function art(card){const img=cardImageTag(card);return `<div class="cardart"><span class="artText">${safe(card.demo?'DEMO':card.id)}</span>${img}</div>`;}
 function renderHome(){$('#metricCards').textContent=cards.length.toLocaleString('zh-TW');$('#metricDecks').textContent=decks.length;$('#metricStatus').textContent=dataKind==='demo'?'DEMO':dataKind==='sync'?'SYNC':'CUSTOM';$('#metricUpdate').textContent=dataKind==='demo'?'示範資料':updatedAt?`更新 ${updatedAt.slice(0,10)}`:'自訂資料';$('#dataBadge').textContent=dataKind==='demo'?'示範資料':dataKind==='sync'?'繁中卡池':'自訂卡池';}
+function displaySetName(id){
+  const title=String(packNames?.[id]||'').replace(/&amp;/gi,'&');
+  const m=title.match(/[【\[]\s*((?:OP|ST|EB|PRB|P|SP|DON)[- ]?\d{1,3})\s*[】\]]/i);
+  const code=m?m[1].toUpperCase().replace(/^(OP|ST|EB|PRB|P|SP|DON)(\d)/,'$1-$2'):'';
+  const short=title.replace(/【[^】]*】|\[[^\]]*\]/g,'').replace(/^\s*(?:補充包|起始牌組|特殊補充包|擴充包|收藏包)\s*/,'').trim();
+  if(code&&short)return code+'｜'+short;
+  return code||title||(id==='DEMO'?'示範資料':'其他系列（'+id+'）');
+}
 function updateSetFilter(){
- const e=$('#setFilter'), prev=e.value;
- const ids=[...new Set(cards.map(c=>c.pack_id).filter(Boolean))];
- ids.sort((a,b)=>(packNames[a]||a).localeCompare(packNames[b]||b,'zh-TW',{numeric:true}));
- e.innerHTML='<option value="">全部系列</option>'+ids.map(id=>`<option value="${safe(id)}">${safe(packNames[id]||'其他系列（'+id+'）')}</option>`).join('');
- if(ids.includes(prev))e.value=prev;
+  const e=$('#setFilter'),prev=e.value;
+  const ids=[...new Set(cards.map(c=>c.pack_id).filter(Boolean))];
+  const sortKey=id=>{const v=displaySetName(id);const m=v.match(/^(OP|EB|ST|PRB|SP|P|DON)-(\d+)/);return m?String(['OP','EB','ST','PRB','SP','P','DON'].indexOf(m[1])).padStart(2,'0')+'-'+m[2].padStart(3,'0'): '99-'+v;};
+  ids.sort((a,b)=>sortKey(a).localeCompare(sortKey(b),'zh-TW',{numeric:true}));
+  e.innerHTML='<option value="">全部系列</option>'+ids.map(id=>`<option value="${safe(id)}">${safe(displaySetName(id))}</option>`).join('');
+  if(ids.includes(prev))e.value=prev;
 }
 function cardMatches(c){const q=$('#cardSearch').value.trim().toLowerCase();const color=$('#colorFilter').value,type=$('#typeFilter').value,set=$('#setFilter').value;return(!q||[c.name,c.id,c.effect,c.pack_id].some(v=>String(v||'').toLowerCase().includes(q)))&&(!color||c.colors.includes(color))&&(!type||c.category===type)&&(!set||c.pack_id===set);}
 function renderCards(){const matched=cards.filter(cardMatches);$('#cardCount').textContent=`${matched.length.toLocaleString('zh-TW')} 張卡牌`;
  $('#cardGrid').innerHTML=matched.slice(0,shownCards).map(c=>`<button class="cardtile" data-card="${safe(c.id)}"><div class="coloredge" style="--edge:${cardColor(c)}"></div>${art(c)}<div class="cardmeta"><strong title="${safe(c.name)}">${safe(c.name)}</strong><small>${safe(c.id)} · ${safe(c.cost??c.category)}</small></div></button>`).join('')||'<div class="note">找不到符合條件的卡牌。</div>';
  $('#moreCards').hidden=matched.length<=shownCards;
 }
-function openCard(id){const c=byId(id);if(!c)return;const isLeader=c.category==='Leader';const details=`<p><strong>卡號：</strong>${safe(c.id)}</p><p><strong>顏色：</strong>${c.colors.map(x=>COLORS[x]?.[0]||safe(x)).join('、')}</p><p><strong>種類：</strong>${safe(c.category)}</p><p><strong>系列：</strong>${safe(packNames[c.pack_id]||c.pack_id)}</p><p><strong>稀有度：</strong>${safe(c.rarity||'—')}</p><p><strong>費用：</strong>${safe(c.cost??'—')}　<strong>力量：</strong>${safe(c.power??'—')}</p><p><strong>反擊：</strong>${safe(c.counter??'—')}</p><p><strong>效果：</strong>${safe(c.effect||'—')}</p>${c.trigger?`<p><strong>觸發：</strong>${safe(c.trigger)}</p>`:''}`;
+function openCard(id){const c=byId(id);if(!c)return;const isLeader=c.category==='Leader';const details=`<p><strong>卡號：</strong>${safe(c.id)}</p><p><strong>顏色：</strong>${c.colors.map(x=>COLORS[x]?.[0]||safe(x)).join('、')}</p><p><strong>種類：</strong>${safe(c.category)}</p><p><strong>系列：</strong>${safe(displaySetName(c.pack_id))}</p><p><strong>稀有度：</strong>${safe(c.rarity||'—')}</p><p><strong>費用：</strong>${safe(c.cost??'—')}　<strong>力量：</strong>${safe(c.power??'—')}</p><p><strong>反擊：</strong>${safe(c.counter??'—')}</p><p><strong>效果：</strong>${safe(c.effect||'—')}</p>${c.trigger?`<p><strong>觸發：</strong>${safe(c.trigger)}</p>`:''}`;
  $('#dialogBody').innerHTML=`<div class="dialogbody">${art(c)}<div><h2>${safe(c.name)}</h2><div class="colorDots">${dots(c)}</div><div class="details">${details}</div><button class="primary" data-cardact="${isLeader?'leader':'add'}" data-id="${safe(c.id)}">${isLeader?'設為領航員':'加入目前牌組'}</button></div></div>`;$('#cardDialog').showModal();}
 function getLeader(){return byId(currentDeck.leaderId);}
 function canInclude(c){const leader=getLeader();return !!leader&&c.category!=='Leader'&&c.category!=='Don'&&c.colors.some(x=>leader.colors.includes(x));}
@@ -106,6 +140,7 @@ async function fetchJson(url){const res=await fetch(url,{cache:'no-store'});if(!
 async function loadPublishedCards(force=false){
   const snapshot=await fetchJson(CARD_SNAPSHOT_URL+'?v='+Date.now());
   packNames=snapshot.sets&&typeof snapshot.sets==='object'&&!Array.isArray(snapshot.sets)?snapshot.sets:packNames;
+  await put('packNames',packNames).catch(()=>{});
   updateSetFilter();
   if(!Array.isArray(snapshot?.cards)||snapshot.cards.length<100)throw Error('公開卡表尚未完成首次同步，請先執行 GitHub Actions');
   // Custom/imported card collections remain under the user’s explicit control.
@@ -175,7 +210,8 @@ function bindEvents(){
  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;$('#installBtn').hidden=false;});$('#installBtn').addEventListener('click',async()=>{if(!deferredInstall)return;deferredInstall.prompt();await deferredInstall.userChoice;deferredInstall=null;$('#installBtn').hidden=true;});
 }
 async function init(){bindEvents();try{const saved=await get('catalogue');if(saved?.cards?.length){cards=saved.cards;dataKind=saved.kind||'import';updatedAt=saved.updatedAt||'';}decks=(await get('decks'))||[];const draft=await get('draft');if(validDeck(draft))currentDeck=draft;}catch(e){console.warn('IndexedDB unavailable:',e);toast('裝置儲存功能可能不可用，請勿依賴本機備份');}
- updateSetFilter();renderHome();renderData();nav('home');
+  try{const names=await get('packNames');if(names&&typeof names==='object')packNames=names;}catch{}
+  updateSetFilter();renderHome();renderData();nav('home');
  loadPublishedCards().then(outcome=>{if(outcome==='updated'){renderData();renderHome();if(currentPage==='cards')renderCards();if(currentPage==='results'||currentPage==='meta')window.renderResults?.(currentPage);}}).catch(e=>console.info('Using saved or demo catalogue:',e.message));
  loadSyncStatus();
  fetchJson('./data/rules.json?v='+Date.now()).then(r=>{if(r?.rulesets&&Array.isArray(r.rulesets)){rulebook=r;$('#ruleWarning').textContent=r.rulesets.some(x=>x.verified)?'存在已核對的規則版本，請仍依實際賽區與賽期複核。':'目前沒有已核實的禁限卡版本；只檢查標準 50 張、顏色和四張上限。';}}).catch(()=>{});

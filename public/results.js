@@ -58,7 +58,7 @@
         <button data-favorite="${enc(x.id)}" aria-pressed="${isFav}">${isFav?'★ 已收藏':'☆ 收藏'}</button>
         <button data-compare="${enc(x.id)}" aria-pressed="${selected}" ${full?'':'disabled title="未取得完整 50 張牌組"'}>${selected?'✓ 已加入比較':'加入比較'}</button>
         <button data-copy-result="${enc(x.id)}" ${full?'':'disabled'}>複製清單</button><button data-edit-result="${enc(x.id)}" ${full?'':'disabled'}>帶入組牌</button></div>
-        <details class="resultDetails"><summary>資料證據與${full?'完整 50 張牌組':'不完整牌組（不可匯入）'}</summary><p>${enc(x.evidence||'請查看原始來源。')}</p>${entries.length?`<div class="cardsRows">${entries.map(([id,n])=>`<div class="deckCardVisual">${mini(id)}<span><strong>${enc(cardName(id))}</strong><small>${enc(id)} · ${enc(n)} 張</small></span><b>×${enc(n)}</b></div>`).join('')}</div>`:'<p>沒有公開完整卡號；不會產生虛構卡表。</p>'}</details></article>`;
+        <details class="resultDetails"><summary>卡圖對照・資料證據與${full?'完整 50 張牌組':'不完整牌組（不可匯入）'}</summary><p>${enc(x.evidence||'請查看原始來源。')}</p>${entries.length?`<div class="cardsRows">${entries.map(([id,n])=>`<div class="deckCardVisual">${mini(id)}<span><strong>${enc(cardName(id))}</strong><small>${enc(id)} · ${enc(n)} 張</small></span><b>×${enc(n)}</b></div>`).join('')}</div>`:'<p>沒有公開完整卡號；不會產生虛構卡表。</p>'}</details></article>`;
     }).join(''):'<div class="panel">目前沒有符合搜尋或日期的來源紀錄。更換條件，或等待下一次合法資料同步。</div>';
     const box=$('compareHint');if(box)box.innerHTML=`已選 <strong>${compareIds.length}/2</strong> 套完整牌組。${compareIds.length===2?'<button class="primary small" id="showComparison">立即比較差異</button>':'請從賽事卡片點選「加入比較」。'}`;
     $('showComparison')?.addEventListener('click',showComparison);

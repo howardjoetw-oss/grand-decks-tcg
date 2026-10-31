@@ -41,3 +41,21 @@
 .compareRow>span>small{font-size:10px;color:var(--muted)}
 .compareRow .miniCard{width:29px;height:41px}
 @media(max-width:760px){.cardsRows{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.resultLeader>.miniCard{width:52px;height:73px}.cardsRows .deckCardVisual{padding:4px;gap:5px}.cardsRows .deckCardVisual>.miniCard{width:100%;height:auto;aspect-ratio:5/7}.cardsRows .deckCardVisual strong{font-size:10px}}
+
+/* v10: readable deck images across catalog, builder, and all tournament lists. */
+.cardart.artUnavailable,.miniCard.artUnavailable,.leaderCardArt.artUnavailable{border-color:#9c7450!important}
+.cardart.artUnavailable:after{content:'圖片暫不可用';position:absolute;bottom:10px;left:5px;right:5px;text-align:center;color:#d1b583;font-size:10px;z-index:0}
+.miniCard.artUnavailable:after,.leaderCardArt.artUnavailable:after{content:'圖片載入失敗';position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:8px;color:#ead09b;background:#1c293d}
+.leaderCardArt>img,.miniCard>img{width:100%;height:100%;object-fit:cover;display:block}
+.buildrow{grid-template-columns:54px minmax(0,1fr) auto;gap:10px}
+.buildrow>.miniCard{width:54px;height:76px}
+.deckentry>.miniCard{width:42px;height:59px}
+.myDeckHeader>.miniCard{width:50px;height:70px}
+.cardsRows{grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:9px}
+.cardsRows .deckCardVisual{display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:0}
+.cardsRows .deckCardVisual>.miniCard{height:auto;width:100%;aspect-ratio:5/7}
+.cardsRows .deckCardVisual>span:not(.miniCard){min-width:0}
+.cardsRows .deckCardVisual>span:not(.miniCard)>strong{white-space:normal;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cardsRows .deckCardVisual b{position:absolute;top:9px;right:9px;z-index:3}
+@media(max-width:760px){.cardsRows{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.cardsRows .deckCardVisual{padding:4px}.buildrow>.miniCard{width:42px;height:59px}.buildrow{grid-template-columns:42px minmax(0,1fr) auto}}
+@media(max-width:420px){.cardsRows{grid-template-columns:repeat(2,minmax(0,1fr))}}
