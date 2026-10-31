@@ -20,10 +20,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Test all source parsers and schema
-        run: python -m unittest discover -s scripts -p 'test_*.py' -v
       - name: Install HTML parser (free)
         run: python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+      - name: Test all source parsers and schema
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
       - name: Source collection + resilient summaries
         run: python scripts/run_sync.py
       - name: Validate generated JSON
