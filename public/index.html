@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0c1424">
+  <meta name="description" content="非官方航海王卡牌遊戲玩家工具：繁體中文卡牌搜尋、組牌、私人牌組與資料匯入。">
+  <link rel="icon" type="image/png" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+  <title>GRAND DECKS｜航海王卡牌戰術室 · 全球賽事牌組</title>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="logo"><span class="mark">GD</span><span><strong>GRAND DECKS</strong><small>ONE PIECE CARD GAME · 玩家工具</small></span></div>
+      <div class="topActions"><span id="dataBadge" class="tag">示範資料</span><button id="installBtn" class="iconBtn" hidden>安裝 App</button></div>
+    </header>
+    <div class="layout">
+      <aside class="sidebar" aria-label="導覽">
+        <div class="sidehead">MAIN MENU</div>
+        <button class="nav active" data-page="home"><span>⌂</span> 總覽</button>
+        <button class="nav" data-page="results"><span>🏆</span> 賽事牌組</button>
+        <button class="nav" data-page="meta"><span>◈</span> Meta 趨勢</button>
+        <button class="nav" data-page="cards"><span>▦</span> 卡牌圖鑑</button>
+        <button class="nav" data-page="builder"><span>♧</span> 組牌工作室</button>
+        <button class="nav" data-page="decks"><span>▤</span> 我的牌組</button>
+        <button class="nav" data-page="data"><span>⚙</span> 資料管理</button>
+        <div class="sidetip">離線使用已載入的卡牌資料；請定期匯出備份，避免瀏覽器資料清除後遺失。</div>
+      </aside>
+      <main class="content" id="mainContent">
+        <section class="page active" id="page-home">
+          <div class="hero"><div class="eyebrow">TOURNAMENT META · DECK LAB PWA</div><h1>打造自己的<br><em>偉大航路牌組</em></h1><p>全球優勝牌組蒐集、Meta 趨勢、卡牌查詢與私人組牌，一個手機上的競技情報站。</p><div class="heroButtons"><button class="primary" data-go="results">查看最新優勝牌組 ↗</button><button class="secondary" data-go="builder">開始組牌</button></div><div class="heroAccent">01 / GRAND LINE</div></div>
+          <div class="sectionTitle"><h2>你的戰術中心</h2><span>TOOLKIT</span></div>
+          <div class="metrics"><div class="metric"><small>目前卡牌</small><strong id="metricCards">—</strong><span>張可查詢</span></div><div class="metric"><small>我的牌組</small><strong id="metricDecks">—</strong><span>套已儲存</span></div><div class="metric"><small>資料狀態</small><strong id="metricStatus">DEMO</strong><span id="metricUpdate">等待同步</span></div></div>
+          <div class="featuregrid"><button class="feature" data-go="results"><span class="featureIcon">🏆</span><strong>全球賽事牌組</strong><p>查詢來源、排名、參賽人數與已公開戰績。</p><span class="featureNext">查看戰績 →</span></button><button class="feature" data-go="meta"><span class="featureIcon">◈</span><strong>Meta 榜</strong><p>依近期上位牌組統計使用領航員及趨勢。</p><span class="featureNext">查看榜單 →</span></button><button class="feature" data-go="cards"><span class="featureIcon">▧</span><strong>卡牌圖鑑</strong><p>依名稱、卡號、顏色與種類快速篩選。</p><span class="featureNext">開啟 →</span></button><button class="feature" data-go="builder"><span class="featureIcon">✦</span><strong>智慧組牌</strong><p>選擇領航員，檢查卡色、張數與重複上限。</p><span class="featureNext">開啟 →</span></button><button class="feature" data-go="decks"><span class="featureIcon">▤</span><strong>我的牌組</strong><p>私人儲存、備份與複製牌組文字。</p><span class="featureNext">開啟 →</span></button><button class="feature" data-go="data"><span class="featureIcon">⇅</span><strong>繁中資料同步</strong><p>從公開資料集取得完整卡片資訊，或匯入 JSON。</p><span class="featureNext">開啟 →</span></button></div>
+          <p class="disclaimer">本站為非官方玩家製作之工具，與萬代及相關權利人無合作或背書關係。初始內容是教學示範資料，並非正式卡牌或真實賽事紀錄。</p>
+        </section>
+        <section class="page" id="page-results">
+          <div class="pageHead"><div><span class="eyebrow">TOURNAMENT INTELLIGENCE · PWA</span><h1>全球賽事優勝牌組</h1><p>公開賽事結果與來源網站報告分開標示，沒有完整對戰資料就不冒稱高勝率。</p></div><button id="refreshResults" class="secondary small">重新讀取</button></div>
+          <div id="resultsStatus" class="note" aria-live="polite">載入公開牌組資料中…</div>
+          <div class="resultMetrics"><div class="metric"><small>已收錄賽事牌組</small><strong id="rCount">—</strong><span>持續更新 / 去重</span></div><div class="metric"><small>不同領航員</small><strong id="rLeaders">—</strong><span>來源已公開的牌組</span></div><div class="metric"><small>賽事來源</small><strong id="rSources">—</strong><span>來源可點擊核對</span></div></div>
+          <div class="filters resultsFilters"><input id="resultsSearch" type="search" placeholder="搜尋領航員、玩家、比賽..." aria-label="搜尋賽事"><select id="resultsCountry"><option value="">全部地區</option><option value="JP">日本</option><option value="TW">台灣</option><option value="ASIA">其他亞洲</option><option value="EU">歐洲</option><option value="NA">北美</option><option value="OTHER">其他地區</option></select><select id="resultsSource"><option value="">全部來源</option><option value="Limitless Play">Limitless Play</option><option value="ONE PIECE TOP DECKS">ONE PIECE TOP DECKS</option><option value="社群候選">社群候選（待查證）</option></select><select id="resultsRank"><option value="">全部名次</option><option value="1">只看冠軍</option><option value="4">前四</option><option value="8">前八</option></select></div>
+          <div class="resultbar"><span id="resultsCountText">— 套結果</span><span class="lighttxt">點開可查看牌組與原始來源</span></div><div id="resultsGrid" class="resultsGrid"></div>
+          <div class="panel" style="margin-top:20px"><div class="panelheading"><strong>社群牌組觀察清單（個人本機）</strong><span>不列為已驗證勝率</span></div><p>看見 X、Reddit、YouTube 的熱門構築，可先記錄來源。它們只會保存在你的瀏覽器，須查證後才適合納入公開資料庫。</p><div class="socialForm"><input id="communityLeader" placeholder="領航員／牌組名稱" maxlength="100"><input id="communityLink" placeholder="https://x.com/… 或其他公開來源連結" type="url"><button class="secondary" id="saveCommunity">加入候選</button></div><div id="communityNotes" class="note" style="margin-top:14px"></div></div>
+          <p class="disclaimer">來源連結有時不包含可下載的完整 50 張卡片清單。本站僅呈現實際取得的欄位；個別玩家已知勝敗場數，不等於整個領航員的 Meta 勝率。請留意不同地區禁限卡和卡包環境不同。</p>
+        </section>
+        <section class="page" id="page-meta">
+          <div class="pageHead"><div><span class="eyebrow">TOP-CUT META · LEADER DATA</span><h1>近期領航員趨勢</h1><p>以資料庫中上位牌組的佔比統計，不等於全體出賽使用率或整體勝率。</p></div><button class="secondary small" data-go="results">查看牌組</button></div>
+          <div id="metaStatus" class="note">載入中…</div><div id="metaList" class="metaList"></div>
+          <div class="note">數據可能有來源收錄偏差；當分母過小、資料跨禁限卡日期或日英不同賽制時，切勿解讀為全球實際勝率。</div>
+        </section>
+        <section class="page" id="page-cards"><div class="pageHead"><div><span class="eyebrow">CARD DATABASE</span><h1>卡牌圖鑑</h1><p>搜尋卡號、名稱與卡片條件。</p></div><button class="secondary small" data-go="data">資料來源與同步</button></div>
+          <div class="filters"><input id="cardSearch" type="search" placeholder="搜尋卡牌名稱、卡號、特徵..." aria-label="搜尋卡牌"><select id="colorFilter" aria-label="顏色"><option value="">全部顏色</option><option value="Red">紅</option><option value="Green">綠</option><option value="Blue">藍</option><option value="Purple">紫</option><option value="Black">黑</option><option value="Yellow">黃</option></select><select id="typeFilter" aria-label="卡牌類型"><option value="">全部類型</option><option value="Leader">領航員</option><option value="Character">角色</option><option value="Event">事件</option><option value="Stage">場景</option></select><select id="setFilter" aria-label="系列"><option value="">全部系列</option></select></div>
+          <div class="resultbar"><span id="cardCount">— 張卡牌</span><span class="lighttxt">點選卡牌查看詳細資料</span></div><div id="cardGrid" class="cardgrid"></div><div class="moreWrap"><button class="secondary" id="moreCards" hidden>載入更多卡牌</button></div>
+        </section>
+        <section class="page" id="page-builder"><div class="pageHead"><div><span class="eyebrow">DECK BUILDER</span><h1>組牌工作室</h1><p>標準基本規則：1 張領航員、50 張主牌、每卡號至多 4 張。</p></div><button id="clearDeck" class="secondary small">重置草稿</button></div>
+          <div class="builderlayout"><div class="builderLeft"><div class="panel"><div class="panelheading"><strong>01 · 選擇領航員</strong><span id="leaderSelected">尚未選擇</span></div><div id="leaderPicks" class="leaderPicks"></div></div><div class="panel"><div class="panelheading"><strong>02 · 加入卡牌</strong><span>符合領航員顏色</span></div><input type="search" id="buildSearch" placeholder="搜尋可加入的卡牌（名稱或卡號）"><div id="buildAvailable" class="buildAvailable"></div><button id="buildMore" class="secondary small full" hidden>顯示更多可用卡牌</button></div></div>
+            <div class="builderRight"><div class="panel stick"><div class="panelheading"><strong>03 · 牌組配置</strong><span class="countchip" id="deckCount">0 / 50</span></div><label class="inputlabel" for="deckName">牌組名稱</label><input id="deckName" placeholder="例如：紅色快攻測試牌組" maxlength="60"><div class="progress"><div id="deckProgress"></div></div><div id="deckWarning" class="notice">請先選擇領航員。</div><div id="deckEntries" class="deckEntries empty">尚未加入卡牌</div><div class="actions"><button class="primary" id="saveDeck">儲存牌組</button><button class="secondary" id="copyDeck">複製牌組文字</button></div><small class="helptext">此工具只檢查一般張數與顏色，未完整驗證禁限卡及特殊構築規則；正式賽事請以當期官方公告為準。</small></div></div></div>
+        </section>
+        <section class="page" id="page-decks"><div class="pageHead"><div><span class="eyebrow">MY DECKLISTS</span><h1>我的牌組</h1><p>儲存在目前裝置瀏覽器，未上傳雲端。</p></div><button class="primary small" data-go="builder">+ 建立牌組</button></div><div class="panel"><div id="myDecks" class="myDecks"></div></div><div class="note">賽事牌組資料、賽事成績和排行需要獨立資料來源；此初版不會把示範牌組偽裝成真實冠軍牌組。</div></section>
+        <section class="page" id="page-data"><div class="pageHead"><div><span class="eyebrow">DATA & PRIVACY</span><h1>資料管理</h1><p>掌握資料來源、同步與備份。</p></div></div>
+          <div class="settingsgrid"><div class="panel"><h3>同步繁體中文卡牌</h3><p>嘗試讀取 Punk Records 的台灣繁中公開卡牌 JSON。需連網；來源更新與供應狀態由原專案決定。圖片連結仍由官方/來源網站提供。</p><button class="primary" id="syncBtn">同步卡牌資料</button><div id="syncStatus" class="syncStatus" role="status">目前使用內建示範卡牌。</div><p class="tiny">來源：<a href="https://github.com/Kuroro1990/OPTCG" target="_blank" rel="noopener noreferrer">Punk Records / OPTCG</a>。卡牌美術與文字權利仍屬相關權利人，請遵守其使用條款。</p></div>
+          <div class="panel"><h3>匯入自己的 JSON</h3><p>支援卡牌陣列或 <code>{"cards": [...]}</code> 格式；屬性如 id、name、colors、category、cost、power、img_full_url。</p><label class="fileLabel" for="importCards">選擇卡牌 JSON 檔案<input type="file" id="importCards" accept=".json,application/json" hidden></label><p class="tiny">匯入會取代目前卡牌資料，不刪除已儲存牌組。</p></div>
+          <div class="panel"><h3>備份與還原牌組</h3><p>牌組只儲存在本機瀏覽器。建議將備份 JSON 存到自己的雲端硬碟。</p><div class="actions"><button class="secondary" id="exportBackup">匯出所有牌組</button><label class="fileLabel small" for="importBackup">還原牌組 JSON<input type="file" id="importBackup" accept=".json,application/json" hidden></label></div></div>
+          <div class="panel"><h3>回到示範資料</h3><p>測試介面時可切換回教學用的虛構卡片。</p><button class="secondary" id="demoReset">使用示範資料</button><p class="tiny">這不會刪除你先前儲存的私人牌組。</p></div></div>
+          <div class="note">PWA 離線支援：程式介面與本機已儲存資料可離線使用；首次同步與遠端卡圖仍需要網路。更新網站或清除瀏覽器資料前，請先備份。</div>
+        </section>
+      </main>
+    </div>
+    <nav class="bottomnav" aria-label="手機導覽"><button class="active" data-page="home">⌂<span>總覽</span></button><button data-page="results">🏆<span>賽事</span></button><button data-page="meta">◈<span>Meta</span></button><button data-page="cards">▦<span>卡牌</span></button><button data-page="builder">♧<span>組牌</span></button><button data-page="decks">▤<span>牌組</span></button></nav>
+  </div>
+  <dialog id="cardDialog"><div class="dialogHead"><span>卡牌詳情</span><button id="closeDialog" class="iconBtn" aria-label="關閉">✕</button></div><div id="dialogBody"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js" defer></script>
+  <script src="./results.js" defer></script>
+</body>
+</html>
