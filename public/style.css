@@ -85,3 +85,19 @@
 .leaderChoose{display:block;width:100%;background:#243854;border:1px solid #596681;border-radius:6px;color:var(--txt);font-weight:650;font-size:11px;padding:5px 3px;margin-top:7px}
 .leaderChoose:hover,.leaderChoose:focus-visible{border-color:var(--gold);color:var(--gold)}
 .leaderpick.selected .leaderChoose{background:#59462d;color:var(--gold);border-color:var(--gold)}
+
+/* v12 release history and card text accessibility */
+.releaseChip{border:1px solid #7e6b49;border-radius:99px;padding:5px 10px;background:#231e19;color:var(--gold);font-weight:800;font-size:11px;white-space:nowrap;cursor:pointer;line-height:1.4}
+.releaseChip:hover,.releaseChip:focus-visible{border-color:var(--gold);background:#393125;outline:2px solid transparent}
+.versionDialog{width:min(660px,94vw);max-height:min(84vh,780px)}
+.versionList{padding:12px 22px 24px;display:grid;gap:12px}
+.releaseEntry{border-bottom:1px solid var(--line);padding:12px 0 16px}
+.releaseEntry:last-child{border:0}
+.releaseRow{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.releaseRow strong{color:var(--gold);font-size:15px}
+.releaseRow small{color:var(--sub);font-size:11px}
+.releaseEntry h3{font-size:15px;margin:8px 0}
+.releaseEntry ul{padding-left:20px;margin:4px 0;font-size:13px;color:var(--sub);line-height:1.7}
+.cardDetailEffect p{white-space:pre-line;overflow-wrap:anywhere}
+.effectSourceLabel{font-size:11px;color:var(--sub);display:block;margin-top:8px}
+@media(max-width:670px){.topbar{height:auto;min-height:76px;padding:10px 12px;gap:8px}.logo{gap:8px;flex-wrap:wrap}.logo strong{font-size:14px}.logo small{font-size:8px}.releaseChip{font-size:10px;padding:4px 8px}.topActions{gap:4px}.topActions .tag{font-size:10px;padding:4px 8px}.iconBtn{font-size:11px;padding:5px 8px}.versionList{padding:8px 14px 18px}}

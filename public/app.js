@@ -98,23 +98,68 @@ function renderCards(){const matched=cards.filter(cardMatches);$('#cardCount').t
  $('#moreCards').hidden=matched.length<=shownCards;
 }
 // All card images across the PWA open this one read-only-by-default detail viewer.
+// Card text remains with its source; read the full Traditional Chinese pack only on demand.
+// This avoids republishing thousands of copyrighted effect texts in public/data/cards.json.
+const effectPackRequests = new Map();
+const EFFECT_SOURCE = 'https://raw.githubusercontent.com/buhbbl/punk-records/main/chinese-taiwan/data/';
+async function loadOfficialCardText(card) {
+  const pack = String(card?.pack_id || '').trim();
+  if(!/^[A-Za-z0-9_-]{3,24}$/.test(pack))throw Error('沒有可用的繁中系列代碼');
+  if(!effectPackRequests.has(pack)) {
+    const request = fetch(EFFECT_SOURCE + encodeURIComponent(pack) + '.json', {cache:'default'})
+      .then(resp=>{if(!resp.ok)throw Error('HTTP '+resp.status);return resp.json();})
+      .then(rows=>{if(!Array.isArray(rows))throw Error('來源資料格式錯誤');return rows;})
+      .catch(err=>{effectPackRequests.delete(pack);throw err;});
+    effectPackRequests.set(pack,request);
+  }
+  const rows = await effectPackRequests.get(pack);
+  const id = String(card.id||'').toUpperCase();
+  const matched = rows.find(row=>String(row?.id||'').toUpperCase()===id) ||
+    rows.find(row=>String(row?.id||'').toUpperCase().startsWith(id+'_'));
+  if(!matched)throw Error('來源中找不到此卡的完整紀錄');
+  return {
+    effect:typeof matched.effect==='string'?matched.effect.trim():'',
+    trigger:typeof matched.trigger==='string'?matched.trigger.trim():'',
+    types:Array.isArray(matched.types)?matched.types.filter(x=>typeof x==='string').slice(0,12):[],
+    attributes:Array.isArray(matched.attributes)?matched.attributes.filter(x=>typeof x==='string').slice(0,8):[],
+    source:EFFECT_SOURCE+encodeURIComponent(pack)+'.json'
+  };
+}
+
 function openCard(id){
  const key=String(id||'').trim().toUpperCase();
  const known=byId(key);
- // A tournament deck may reference a card not yet in our Chinese metadata index.
- // Show its ID and remote image if available, but NEVER invent stats or effects.
+ // Unknown tournament IDs are shown without fabricated card details.
  if(!known&&!/^[A-Z0-9]{1,10}-\d{2,4}$/.test(key))return;
  const c=known||{id:key,name:key,colors:[],category:'',pack_id:key.split('-')[0],cost:null,power:null,counter:null,rarity:'',effect:'',trigger:'',image:'',demo:false};
  const cat=({Leader:'領航員',Character:'角色',Event:'事件',Stage:'場景',Don:'咚!!'})[c.category]||c.category||'未收錄';
  const record=known?'':'<p class="cardDetailWarning">這張卡暫未收錄於目前繁中卡牌索引，僅能辨識卡號與嘗試載入卡圖。</p>';
- const display=(v)=>v===null||v===undefined||v===''?'未收錄':safe(v);
- const effect=c.effect?display(c.effect):'目前索引未提供文字效果，請參考卡面或官方卡表。';
- const details=`<dl class="cardDetailFacts"><div><dt>卡號</dt><dd>${safe(c.id)}</dd></div><div><dt>卡牌種類</dt><dd>${safe(cat)}</dd></div><div><dt>顏色</dt><dd>${c.colors.length?c.colors.map(x=>COLORS[x]?.[0]||safe(x)).join('、'):'未收錄'}</dd></div><div><dt>所屬系列</dt><dd>${safe(displaySetName(c.pack_id))}</dd></div><div><dt>稀有度</dt><dd>${display(c.rarity)}</dd></div><div><dt>費用</dt><dd>${display(c.cost)}</dd></div><div><dt>力量</dt><dd>${display(c.power)}</dd></div><div><dt>反擊值</dt><dd>${display(c.counter)}</dd></div></dl><div class="cardDetailEffect"><strong>卡牌效果</strong><p>${effect}</p>${c.trigger?`<strong>觸發效果</strong><p>${safe(c.trigger)}</p>`:''}</div>`;
- // Reading tournament results or personal deck lists must never change the draft.
+ const display=v=>v===null||v===undefined||v===''?'未收錄':safe(v);
+ const details=`<dl class="cardDetailFacts"><div><dt>卡號</dt><dd>${safe(c.id)}</dd></div><div><dt>卡牌種類</dt><dd>${safe(cat)}</dd></div><div><dt>顏色</dt><dd>${c.colors.length?c.colors.map(x=>COLORS[x]?.[0]||safe(x)).join('、'):'未收錄'}</dd></div><div><dt>所屬系列</dt><dd>${safe(displaySetName(c.pack_id))}</dd></div><div><dt>稀有度</dt><dd>${display(c.rarity)}</dd></div><div><dt>費用</dt><dd>${display(c.cost)}</dd></div><div><dt>力量</dt><dd>${display(c.power)}</dd></div><div><dt>反擊值</dt><dd>${display(c.counter)}</dd></div></dl>`;
+ const shouldLoad=!!known&&!c.demo&&!c.effect&&!c.trigger;
+ const effectText=c.effect?safe(c.effect):shouldLoad?'正在從繁中來源查詢卡牌效果…':'未收錄卡牌效果';
+ const triggerBlock=c.trigger?`<strong>觸發效果</strong><p>${safe(c.trigger)}</p>`:'';
+ const effectBlock=`<div class="cardDetailEffect" id="cardDetailEffectPanel" data-detail-id="${safe(c.id)}"><strong>卡牌效果</strong><p>${effectText}</p>${triggerBlock}</div>`;
  const inEditor=currentPage==='cards'||currentPage==='builder';
  const action=known&&inEditor?`<button class="primary" data-cardact="${c.category==='Leader'?'leader':'add'}" data-id="${safe(c.id)}">${c.category==='Leader'?'設為領航員':'加入目前牌組'}</button>`:'';
- $('#dialogBody').innerHTML=`<div class="dialogbody cardDetailLayout">${art(c)}<div class="cardDetailContent"><h2>${safe(c.name||c.id)}</h2><div class="colorDots">${dots(c)}</div>${record}${details}${action}<p class="cardDetailFootnote">圖片由外部來源提供，若無法載入仍可查看已收錄的文字資訊。</p></div></div>`;
+ $('#dialogBody').innerHTML=`<div class="dialogbody cardDetailLayout">${art(c)}<div class="cardDetailContent"><h2>${safe(c.name||c.id)}</h2><div class="colorDots">${dots(c)}</div>${record}${details}${effectBlock}${action}<p class="cardDetailFootnote">卡牌效果按需讀取自 <a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records 繁中資料</a>；美術、卡面及文字權利屬原權利人。若未授權使用請依來源規範處理。</p></div></div>`;
  const dlg=$('#cardDialog');if(!dlg.open)dlg.showModal();
+ if(shouldLoad){
+   loadOfficialCardText(c).then(info=>{
+     const panel=document.getElementById('cardDetailEffectPanel');
+     if(!dlg.open||!panel||panel.dataset.detailId!==c.id)return;
+     let html=`<strong>卡牌效果</strong><p>${info.effect?safe(info.effect):'此卡在繁中來源中沒有記載文字效果。'}</p>`;
+     if(info.trigger)html+=`<strong>觸發效果</strong><p>${safe(info.trigger)}</p>`;
+     if(info.types.length)html+=`<strong>特徵</strong><p>${info.types.map(safe).join('、')}</p>`;
+     if(info.attributes.length)html+=`<strong>屬性</strong><p>${info.attributes.map(safe).join('、')}</p>`;
+     html+='<small class="effectSourceLabel">文字由來源按需載入，與最新官方勘誤可能不同。</small>';
+     panel.innerHTML=html;
+   }).catch(err=>{
+     const panel=document.getElementById('cardDetailEffectPanel');
+     if(!dlg.open||!panel||panel.dataset.detailId!==c.id)return;
+     panel.innerHTML=`<strong>卡牌效果</strong><p>目前無法讀取效果（${safe(err.message)}）。請參考卡面或原始資料來源。</p>`;
+   });
+ }
 }
 window.grandOpenCardDetails=openCard;
 // Capture clicks before the leader-selection button / results controls receive them.

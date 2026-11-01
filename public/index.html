@@ -8,13 +8,13 @@
   <link rel="icon" type="image/png" href="./icons/icon-192.png">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="stylesheet" href="./style.css?v=detail-v11">
+  <link rel="stylesheet" href="./style.css?v=12.0">
   <title>GRAND DECKS｜航海王卡牌戰術室 · 全球賽事牌組</title>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="logo"><span class="mark">GD</span><span><strong>GRAND DECKS</strong><small>ONE PIECE CARD GAME · 玩家工具</small></span></div>
+      <div class="logo"><span class="mark">GD</span><span><strong>GRAND DECKS</strong><small>ONE PIECE CARD GAME · 玩家工具</small></span><button type="button" id="versionHistoryBtn" class="releaseChip" aria-haspopup="dialog" aria-controls="versionDialog">v12.0 · 更新紀錄</button></div>
       <div class="topActions"><span id="dataBadge" class="tag">示範資料</span><button id="installBtn" class="iconBtn" hidden>安裝 App</button></div>
     </header>
     <div class="layout">
@@ -72,9 +72,11 @@
     <nav class="bottomnav" aria-label="手機導覽"><button class="active" data-page="home">⌂<span>總覽</span></button><button data-page="results">🏆<span>賽事</span></button><button data-page="meta">◈<span>Meta</span></button><button data-page="cards">▦<span>卡牌</span></button><button data-page="builder">♧<span>組牌</span></button><button data-page="decks">▤<span>牌組</span></button></nav>
   </div>
   <dialog id="compareDialog" class="compareDialog"><div class="dialogHead"><span>兩套牌組比較</span><button id="closeCompare" class="iconBtn" aria-label="關閉比較">✕</button></div><div id="compareBody" class="compareBody"></div></dialog>
+  <dialog id="versionDialog" class="versionDialog" aria-labelledby="versionDialogTitle"><div class="dialogHead"><span id="versionDialogTitle">GRAND DECKS · 版本更新紀錄</span><button type="button" id="closeVersionDialog" class="iconBtn" aria-label="關閉版本紀錄">✕</button></div><div id="versionList" class="versionList"></div></dialog>
   <dialog id="cardDialog"><div class="dialogHead"><span>卡牌詳情</span><button id="closeDialog" class="iconBtn" aria-label="關閉">✕</button></div><div id="dialogBody"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js?v=detail-v11" defer></script>
-  <script src="./results.js?v=detail-v11" defer></script>
+  <script src="./version-history.js?v=12.0" defer></script>
+  <script src="./app.js?v=12.0" defer></script>
+  <script src="./results.js?v=12.0" defer></script>
 </body>
 </html>
