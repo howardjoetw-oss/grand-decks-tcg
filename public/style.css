@@ -59,3 +59,29 @@
 .cardsRows .deckCardVisual b{position:absolute;top:9px;right:9px;z-index:3}
 @media(max-width:760px){.cardsRows{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.cardsRows .deckCardVisual{padding:4px}.buildrow>.miniCard{width:42px;height:59px}.buildrow{grid-template-columns:42px minmax(0,1fr) auto}}
 @media(max-width:420px){.cardsRows{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* v11: a unified card-detail interaction across catalogue, builder, meta, and results. */
+[data-card-detail]{cursor:zoom-in}
+[data-card-detail]:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:4px}
+.cardTextTrigger{cursor:pointer;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px}
+.cardTextTrigger:hover,.cardTextTrigger:focus-visible{color:var(--gold);text-decoration-color:var(--gold)}
+#cardDialog{width:min(900px,95vw);max-height:91dvh}
+.cardDetailLayout{grid-template-columns:minmax(160px,300px) minmax(0,1fr);align-items:start}
+.cardDetailLayout>.cardart{width:100%;border:1px solid #455974;border-radius:9px;position:sticky;top:74px}
+.cardDetailContent{min-width:0}
+.cardDetailContent h2{font-size:22px;line-height:1.35;overflow-wrap:anywhere}
+.cardDetailFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}
+.cardDetailFacts>div{padding:9px 10px;background:#182840;border:1px solid #2b3e59;border-radius:8px;min-width:0}
+.cardDetailFacts dt{color:#9fb0c8;font-size:11px;margin-bottom:2px}
+.cardDetailFacts dd{margin:0;font-size:14px;overflow-wrap:anywhere}
+.cardDetailEffect{margin:12px 0 18px;padding:12px 13px;border:1px solid #34435e;background:#111d30;border-radius:9px;font-size:13px}
+.cardDetailEffect strong{color:var(--gold)}
+.cardDetailEffect p{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--txt);line-height:1.65;margin:7px 0 12px}
+.cardDetailEffect p:last-child{margin-bottom:2px}
+.cardDetailWarning{border-left:3px solid var(--gold);padding:9px 12px;background:#46382366;font-size:12px}
+.cardDetailFootnote{color:var(--muted);font-size:11px;line-height:1.5}
+@media(max-width:640px){#cardDialog{width:96vw;max-height:92dvh}.cardDetailLayout{grid-template-columns:1fr;padding:13px;gap:12px}.cardDetailLayout>.cardart{position:static;width:min(62vw,240px);margin:auto}.cardDetailContent h2{font-size:19px}.cardDetailFacts{gap:5px}.cardDetailFacts>div{padding:7px}.cardDetailFacts dd{font-size:12px}}
+
+.leaderChoose{display:block;width:100%;background:#243854;border:1px solid #596681;border-radius:6px;color:var(--txt);font-weight:650;font-size:11px;padding:5px 3px;margin-top:7px}
+.leaderChoose:hover,.leaderChoose:focus-visible{border-color:var(--gold);color:var(--gold)}
+.leaderpick.selected .leaderChoose{background:#59462d;color:var(--gold);border-color:var(--gold)}

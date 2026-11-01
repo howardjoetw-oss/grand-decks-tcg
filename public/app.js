@@ -70,7 +70,7 @@ function cardMini(card,cls='miniCard'){
   if(!card)return `<span class="${safe(cls)} noImage" aria-label="卡牌圖像未收錄">?</span>`;
   const title=safe(card.name||card.id),id=safe(card.id);
   const img=cardImageTag(card);
-  return `<span class="${safe(cls)} ${img?'':'noImage'}" title="${title} / ${id}">${img}<small>${id}</small></span>`;
+  return `<span class="${safe(cls)} ${img?'':'noImage'}" data-card-detail="${id}" role="button" tabindex="0" aria-label="查看 ${title} ${id} 詳細資料" title="點擊查看 ${title} / ${id} 詳細資料">${img}<small>${id}</small></span>`;
 }
 window.grandCardInfo=id=>byId(id);
 window.grandCardMini=id=>{const c=byId(id);return cardMini(c||(/^[A-Z0-9]{1,10}-\d{2,4}$/.test(String(id))?{id:String(id),name:String(id),image:'',demo:false}:null));};
@@ -97,19 +97,50 @@ function renderCards(){const matched=cards.filter(cardMatches);$('#cardCount').t
  $('#cardGrid').innerHTML=matched.slice(0,shownCards).map(c=>`<button class="cardtile" data-card="${safe(c.id)}"><div class="coloredge" style="--edge:${cardColor(c)}"></div>${art(c)}<div class="cardmeta"><strong title="${safe(c.name)}">${safe(c.name)}</strong><small>${safe(c.id)} · ${safe(c.cost??c.category)}</small></div></button>`).join('')||'<div class="note">找不到符合條件的卡牌。</div>';
  $('#moreCards').hidden=matched.length<=shownCards;
 }
-function openCard(id){const c=byId(id);if(!c)return;const isLeader=c.category==='Leader';const details=`<p><strong>卡號：</strong>${safe(c.id)}</p><p><strong>顏色：</strong>${c.colors.map(x=>COLORS[x]?.[0]||safe(x)).join('、')}</p><p><strong>種類：</strong>${safe(c.category)}</p><p><strong>系列：</strong>${safe(displaySetName(c.pack_id))}</p><p><strong>稀有度：</strong>${safe(c.rarity||'—')}</p><p><strong>費用：</strong>${safe(c.cost??'—')}　<strong>力量：</strong>${safe(c.power??'—')}</p><p><strong>反擊：</strong>${safe(c.counter??'—')}</p><p><strong>效果：</strong>${safe(c.effect||'—')}</p>${c.trigger?`<p><strong>觸發：</strong>${safe(c.trigger)}</p>`:''}`;
- $('#dialogBody').innerHTML=`<div class="dialogbody">${art(c)}<div><h2>${safe(c.name)}</h2><div class="colorDots">${dots(c)}</div><div class="details">${details}</div><button class="primary" data-cardact="${isLeader?'leader':'add'}" data-id="${safe(c.id)}">${isLeader?'設為領航員':'加入目前牌組'}</button></div></div>`;$('#cardDialog').showModal();}
+// All card images across the PWA open this one read-only-by-default detail viewer.
+function openCard(id){
+ const key=String(id||'').trim().toUpperCase();
+ const known=byId(key);
+ // A tournament deck may reference a card not yet in our Chinese metadata index.
+ // Show its ID and remote image if available, but NEVER invent stats or effects.
+ if(!known&&!/^[A-Z0-9]{1,10}-\d{2,4}$/.test(key))return;
+ const c=known||{id:key,name:key,colors:[],category:'',pack_id:key.split('-')[0],cost:null,power:null,counter:null,rarity:'',effect:'',trigger:'',image:'',demo:false};
+ const cat=({Leader:'領航員',Character:'角色',Event:'事件',Stage:'場景',Don:'咚!!'})[c.category]||c.category||'未收錄';
+ const record=known?'':'<p class="cardDetailWarning">這張卡暫未收錄於目前繁中卡牌索引，僅能辨識卡號與嘗試載入卡圖。</p>';
+ const display=(v)=>v===null||v===undefined||v===''?'未收錄':safe(v);
+ const effect=c.effect?display(c.effect):'目前索引未提供文字效果，請參考卡面或官方卡表。';
+ const details=`<dl class="cardDetailFacts"><div><dt>卡號</dt><dd>${safe(c.id)}</dd></div><div><dt>卡牌種類</dt><dd>${safe(cat)}</dd></div><div><dt>顏色</dt><dd>${c.colors.length?c.colors.map(x=>COLORS[x]?.[0]||safe(x)).join('、'):'未收錄'}</dd></div><div><dt>所屬系列</dt><dd>${safe(displaySetName(c.pack_id))}</dd></div><div><dt>稀有度</dt><dd>${display(c.rarity)}</dd></div><div><dt>費用</dt><dd>${display(c.cost)}</dd></div><div><dt>力量</dt><dd>${display(c.power)}</dd></div><div><dt>反擊值</dt><dd>${display(c.counter)}</dd></div></dl><div class="cardDetailEffect"><strong>卡牌效果</strong><p>${effect}</p>${c.trigger?`<strong>觸發效果</strong><p>${safe(c.trigger)}</p>`:''}</div>`;
+ // Reading tournament results or personal deck lists must never change the draft.
+ const inEditor=currentPage==='cards'||currentPage==='builder';
+ const action=known&&inEditor?`<button class="primary" data-cardact="${c.category==='Leader'?'leader':'add'}" data-id="${safe(c.id)}">${c.category==='Leader'?'設為領航員':'加入目前牌組'}</button>`:'';
+ $('#dialogBody').innerHTML=`<div class="dialogbody cardDetailLayout">${art(c)}<div class="cardDetailContent"><h2>${safe(c.name||c.id)}</h2><div class="colorDots">${dots(c)}</div>${record}${details}${action}<p class="cardDetailFootnote">圖片由外部來源提供，若無法載入仍可查看已收錄的文字資訊。</p></div></div>`;
+ const dlg=$('#cardDialog');if(!dlg.open)dlg.showModal();
+}
+window.grandOpenCardDetails=openCard;
+// Capture clicks before the leader-selection button / results controls receive them.
+// This keeps image-tap = inspect separate from choose/add/remove actions.
+function cardDetailTarget(target){return target instanceof Element?target.closest('[data-card-detail]'):null;}
+document.addEventListener('click',event=>{
+ const target=cardDetailTarget(event.target);if(!target)return;
+ event.preventDefault();event.stopImmediatePropagation();openCard(target.dataset.cardDetail);
+},true);
+document.addEventListener('keydown',event=>{
+ if(event.key!=='Enter'&&event.key!==' ')return;
+ const target=cardDetailTarget(event.target);
+ if(!target||event.target!==target)return;
+ event.preventDefault();event.stopImmediatePropagation();openCard(target.dataset.cardDetail);
+},true);
 function getLeader(){return byId(currentDeck.leaderId);}
 function canInclude(c){const leader=getLeader();return !!leader&&c.category!=='Leader'&&c.category!=='Don'&&c.colors.some(x=>leader.colors.includes(x));}
 function addCard(id,delta){const c=byId(id);if(!c)return;if(!canInclude(c)){toast('此卡與領航員顏色不符，或尚未選擇領航員');return;}const old=currentDeck.items[id]||0,next=old+delta;if(next<0||next>4||delta>0&&count()>=50)return; if(next===0)delete currentDeck.items[id];else currentDeck.items[id]=next;saveDraft();renderBuilder();}
 function chooseLeader(id){const c=byId(id);if(!c||c.category!=='Leader')return;const before=Object.keys(currentDeck.items).length;currentDeck.leaderId=id;for(const x of Object.keys(currentDeck.items))if(!canInclude(byId(x)||{category:'?',colors:[]}))delete currentDeck.items[x];saveDraft();renderBuilder();if(before&&Object.keys(currentDeck.items).length<before)toast('已自動移除顏色不符的卡牌');}
 function deckProblems(){const errors=[];const lead=getLeader();if(!lead)errors.push('尚未選擇領航員');if(count()!==50)errors.push(`主牌還需 ${50-count()} 張（標準為 50 張）`);const mismatched=Object.keys(currentDeck.items).filter(x=>!byId(x)||!canInclude(byId(x)));if(mismatched.length)errors.push(`${mismatched.length} 種卡牌不存在或顏色不符`);const rs=rulebook?.rulesets||[];const today=new Date().toISOString().slice(0,10);const matched=rs.find(r=>r.verified===true&&r.region===$('#ruleRegion').value&&r.effectiveFrom<=today&&(!r.effectiveTo||r.effectiveTo>=today));if(matched){for(const id of matched.banned||[])if(currentDeck.items[id])errors.push(`${id}：禁用卡`);for(const [id,max] of Object.entries(matched.restricted||{}))if((currentDeck.items[id]||0)>max)errors.push(`${id}：限制 ${max} 張`);}return errors;}
-function renderBuilder(){const leader=getLeader();$('#leaderSelected').textContent=leader?leader.name:'尚未選擇';const lq=$('#leaderSearch').value.trim().toLowerCase();const leaders=cards.filter(c=>c.category==='Leader'&&(!lq||(c.name+' '+c.id).toLowerCase().includes(lq)));$('#leaderPicks').innerHTML=leaders.slice(0,shownLeaders).map(c=>`<button class="leaderpick ${c.id===currentDeck.leaderId?'selected':''}" data-leader="${safe(c.id)}">${cardMini(c,'leaderCardArt')}<span class="colorDots">${dots(c)}</span><strong>${safe(c.name)}</strong><small>${safe(c.id)}</small></button>`).join('')||'<p class="note">沒有符合條件的領航員卡牌。</p>';$('#moreLeaders').hidden=leaders.length<=shownLeaders;
+function renderBuilder(){const leader=getLeader();$('#leaderSelected').textContent=leader?leader.name:'尚未選擇';const lq=$('#leaderSearch').value.trim().toLowerCase();const leaders=cards.filter(c=>c.category==='Leader'&&(!lq||(c.name+' '+c.id).toLowerCase().includes(lq)));$('#leaderPicks').innerHTML=leaders.slice(0,shownLeaders).map(c=>`<div class="leaderpick ${c.id===currentDeck.leaderId?'selected':''}">${cardMini(c,'leaderCardArt')}<span class="colorDots">${dots(c)}</span><strong class="cardTextTrigger" data-card-detail="${safe(c.id)}" role="button" tabindex="0">${safe(c.name)}</strong><small>${safe(c.id)}</small><button type="button" class="leaderChoose" data-leader="${safe(c.id)}">${c.id===currentDeck.leaderId?'✓ 已選擇':'選為領航員'}</button></div>`).join('')||'<p class="note">沒有符合條件的領航員卡牌。</p>';$('#moreLeaders').hidden=leaders.length<=shownLeaders;
  if(document.activeElement!==$('#deckName'))$('#deckName').value=currentDeck.name||'';
  if(document.activeElement!==$('#buildSearch')){};const q=$('#buildSearch').value.toLowerCase().trim();let eligible=cards.filter(c=>canInclude(c)&&(!q||[c.name,c.id,c.effect].some(x=>String(x||'').toLowerCase().includes(q))));
- $('#buildAvailable').innerHTML=eligible.slice(0,shownBuilder).map(c=>{const n=currentDeck.items[c.id]||0;return `<div class="buildrow">${cardMini(c)}<div><strong>${safe(c.name)}</strong><small>${safe(c.id)} · 費用 ${safe(c.cost??'—')} · ${safe(COLORS[c.colors[0]]?.[0]||'')}</small></div><button class="plus" data-add="${safe(c.id)}" ${n>=4||count()>=50?'disabled':''}>+ ${n?`${n}/4`:'加入'}</button></div>`;}).join('')||'<p class="note">請先選領航員，或調整搜尋條件。</p>';$('#buildMore').hidden=eligible.length<=shownBuilder;
+ $('#buildAvailable').innerHTML=eligible.slice(0,shownBuilder).map(c=>{const n=currentDeck.items[c.id]||0;return `<div class="buildrow">${cardMini(c)}<div><strong class="cardTextTrigger" data-card-detail="${safe(c.id)}" role="button" tabindex="0">${safe(c.name)}</strong><small>${safe(c.id)} · 費用 ${safe(c.cost??'—')} · ${safe(COLORS[c.colors[0]]?.[0]||'')}</small></div><button class="plus" data-add="${safe(c.id)}" ${n>=4||count()>=50?'disabled':''}>+ ${n?`${n}/4`:'加入'}</button></div>`;}).join('')||'<p class="note">請先選領航員，或調整搜尋條件。</p>';$('#buildMore').hidden=eligible.length<=shownBuilder;
  const total=count();$('#deckCount').textContent=`${total} / 50`;$('#deckProgress').style.width=`${Math.min(100,total*2)}%`;const errs=deckProblems(),w=$('#deckWarning');w.textContent=errs.length?errs.join(' · '):'基本構築規則已通過（未檢查禁限卡或特殊規則）';w.classList.toggle('good',errs.length===0);
- const ids=Object.keys(currentDeck.items).sort((a,b)=>{const x=byId(a),y=byId(b);return (x?.cost??0)-(y?.cost??0)||a.localeCompare(b);});const ent=$('#deckEntries');ent.classList.toggle('empty',ids.length===0);ent.innerHTML=ids.length?ids.map(id=>{const c=byId(id);return `<div class="deckentry">${cardMini(c)}<span class="entrytext">${safe(id)} · ${safe(c?.name||'未知卡牌')}</span><button aria-label="移除一張" data-dec="${safe(id)}">−</button><b>${currentDeck.items[id]}</b><button aria-label="加入一張" data-add="${safe(id)}" ${currentDeck.items[id]>=4||total>=50?'disabled':''}>+</button></div>`;}).join(''):'尚未加入卡牌';
+ const ids=Object.keys(currentDeck.items).sort((a,b)=>{const x=byId(a),y=byId(b);return (x?.cost??0)-(y?.cost??0)||a.localeCompare(b);});const ent=$('#deckEntries');ent.classList.toggle('empty',ids.length===0);ent.innerHTML=ids.length?ids.map(id=>{const c=byId(id);return `<div class="deckentry">${cardMini(c)}<span class="entrytext cardTextTrigger" data-card-detail="${safe(id)}" role="button" tabindex="0">${safe(id)} · ${safe(c?.name||'未知卡牌')}</span><button aria-label="移除一張" data-dec="${safe(id)}">−</button><b>${currentDeck.items[id]}</b><button aria-label="加入一張" data-add="${safe(id)}" ${currentDeck.items[id]>=4||total>=50?'disabled':''}>+</button></div>`;}).join(''):'尚未加入卡牌';
 }
 function saveDraft(){put('draft',currentDeck).catch(()=>{});}
 function draftText(d=currentDeck){return `LEADER: ${d.leaderId||'(not set)'}\n`+Object.entries(d.items||{}).sort().map(([id,n])=>`${n}x ${id}`).join('\n');}
@@ -186,6 +217,7 @@ function bindEvents(){
  $('#moreCards').addEventListener('click',()=>{shownCards+=72;renderCards();});
  $('#cardGrid').addEventListener('click',e=>{const tile=e.target.closest('[data-card]');if(tile)openCard(tile.dataset.card);});
  $('#closeDialog').addEventListener('click',()=>$('#cardDialog').close());
+ $('#cardDialog').addEventListener('click',e=>{if(e.target===$('#cardDialog'))$('#cardDialog').close();});
  $('#dialogBody').addEventListener('click',e=>{const b=e.target.closest('[data-cardact]');if(!b)return;$('#cardDialog').close();if(b.dataset.cardact==='leader')chooseLeader(b.dataset.id);else addCard(b.dataset.id,1);nav('builder');});
  $('#leaderPicks').addEventListener('click',e=>{const b=e.target.closest('[data-leader]');if(b)chooseLeader(b.dataset.leader);});
  $('#ruleRegion').addEventListener('change',renderBuilder);

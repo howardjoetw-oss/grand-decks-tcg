@@ -51,14 +51,14 @@
       const wr=Number.isInteger(x.wins)&&Number.isInteger(x.losses)&&x.wins+x.losses>0?percentage(x.wins,x.wins+x.losses):'未公開';
       const entries=Object.entries(x.cards||{}).sort((a,b)=>a[0].localeCompare(b[0]));
       return `<article class="resultCard"><div class="resultTop"><span class="resultRank">${x.placing?'TOP '+enc(x.placing):'名次未公開'}</span><span class="statusPill ${x.sourceType==='platform_result'?'':'unverified'}">${enc(sourcePill(x))}</span></div>
-        <div class="resultLeader">${mini(x.leaderId)}<div><h3>${enc(x.leaderName||x.leaderId)}</h3><div class="resultTags"><span class="resultTag">${enc(x.leaderId)}</span><span class="resultTag">${enc(x.country||'地區未明')}</span><span class="resultTag">${enc(x.date||'日期未明')}</span></div></div></div>
+        <div class="resultLeader">${mini(x.leaderId)}<div><h3 class="cardTextTrigger" data-card-detail="${enc(x.leaderId)}" role="button" tabindex="0">${enc(x.leaderName||x.leaderId)}</h3><div class="resultTags"><span class="resultTag">${enc(x.leaderId)}</span><span class="resultTag">${enc(x.country||'地區未明')}</span><span class="resultTag">${enc(x.date||'日期未明')}</span></div></div></div>
         <p><strong>${enc(x.player||'未公開')}</strong> · ${enc(x.event||'未知賽事')}</p>
         <p>人數 ${x.players==null?'未公開':enc(x.players)} ｜ 個人戰績 ${x.wins==null||x.losses==null?'未公開':enc(x.wins)+' 勝 '+enc(x.losses)+' 敗'}（${wr}）</p>
         <div class="resultActions">${url?`<a href="${enc(url)}" target="_blank" rel="noopener noreferrer">原始來源 ↗</a>`:''}
         <button data-favorite="${enc(x.id)}" aria-pressed="${isFav}">${isFav?'★ 已收藏':'☆ 收藏'}</button>
         <button data-compare="${enc(x.id)}" aria-pressed="${selected}" ${full?'':'disabled title="未取得完整 50 張牌組"'}>${selected?'✓ 已加入比較':'加入比較'}</button>
         <button data-copy-result="${enc(x.id)}" ${full?'':'disabled'}>複製清單</button><button data-edit-result="${enc(x.id)}" ${full?'':'disabled'}>帶入組牌</button></div>
-        <details class="resultDetails"><summary>卡圖對照・資料證據與${full?'完整 50 張牌組':'不完整牌組（不可匯入）'}</summary><p>${enc(x.evidence||'請查看原始來源。')}</p>${entries.length?`<div class="cardsRows">${entries.map(([id,n])=>`<div class="deckCardVisual">${mini(id)}<span><strong>${enc(cardName(id))}</strong><small>${enc(id)} · ${enc(n)} 張</small></span><b>×${enc(n)}</b></div>`).join('')}</div>`:'<p>沒有公開完整卡號；不會產生虛構卡表。</p>'}</details></article>`;
+        <details class="resultDetails"><summary>卡圖對照・資料證據與${full?'完整 50 張牌組':'不完整牌組（不可匯入）'}</summary><p>${enc(x.evidence||'請查看原始來源。')}</p>${entries.length?`<div class="cardsRows">${entries.map(([id,n])=>`<div class="deckCardVisual" data-card-detail="${enc(id)}" role="button" tabindex="0" aria-label="查看 ${enc(cardName(id))} 詳細資料">${mini(id)}<span><strong>${enc(cardName(id))}</strong><small>${enc(id)} · ${enc(n)} 張</small></span><b>×${enc(n)}</b></div>`).join('')}</div>`:'<p>沒有公開完整卡號；不會產生虛構卡表。</p>'}</details></article>`;
     }).join(''):'<div class="panel">目前沒有符合搜尋或日期的來源紀錄。更換條件，或等待下一次合法資料同步。</div>';
     const box=$('compareHint');if(box)box.innerHTML=`已選 <strong>${compareIds.length}/2</strong> 套完整牌組。${compareIds.length===2?'<button class="primary small" id="showComparison">立即比較差異</button>':'請從賽事卡片點選「加入比較」。'}`;
     $('showComparison')?.addEventListener('click',showComparison);
@@ -71,8 +71,8 @@
     const removed=keys.filter(id=>(b.cards[id]||0)<(a.cards[id]||0));
     const unchanged=keys.filter(id=>a.cards[id]===b.cards[id]).length;
     const table=keys.filter(id=>(a.cards[id]||0)!==(b.cards[id]||0))
-      .map(id=>`<div class="compareRow">${mini(id)}<span>${enc(cardName(id))}<small>${enc(id)}</small></span><span class="${(b.cards[id]||0)>(a.cards[id]||0)?'compareDiffMore':'compareDiffLess'}">${a.cards[id]||0} → ${b.cards[id]||0} 張</span></div>`).join('');
-    $('compareBody').innerHTML=`<p>比較卡號與張數，不評斷哪套勝率較高。</p><div class="compareCols"><div class="compareCol"><h3>牌組 A</h3><strong>${enc(a.leaderName||a.leaderId)}</strong><p>${enc(a.date)} · ${enc(a.player||'')}</p></div><div class="compareCol"><h3>牌組 B</h3><strong>${enc(b.leaderName||b.leaderId)}</strong><p>${enc(b.date)} · ${enc(b.player||'')}</p></div></div>
+      .map(id=>`<div class="compareRow">${mini(id)}<span class="cardTextTrigger" data-card-detail="${enc(id)}" role="button" tabindex="0">${enc(cardName(id))}<small>${enc(id)}</small></span><span class="${(b.cards[id]||0)>(a.cards[id]||0)?'compareDiffMore':'compareDiffLess'}">${a.cards[id]||0} → ${b.cards[id]||0} 張</span></div>`).join('');
+    $('compareBody').innerHTML=`<p>比較卡號與張數，不評斷哪套勝率較高。</p><div class="compareCols"><div class="compareCol"><h3>牌組 A</h3><strong class="cardTextTrigger" data-card-detail="${enc(a.leaderId)}" role="button" tabindex="0">${enc(a.leaderName||a.leaderId)}</strong><p>${enc(a.date)} · ${enc(a.player||'')}</p></div><div class="compareCol"><h3>牌組 B</h3><strong class="cardTextTrigger" data-card-detail="${enc(b.leaderId)}" role="button" tabindex="0">${enc(b.leaderName||b.leaderId)}</strong><p>${enc(b.date)} · ${enc(b.player||'')}</p></div></div>
       <p class="warningMeta">${a.leaderId===b.leaderId?'相同領航員，可比較構築差異。':'領航員不同，請留意牌組可能屬不同規則或環境。'} 相同張數卡號：${unchanged} 種；B 張數增加：${added.length} 種；B 張數減少：${removed.length} 種。</p><h3>張數差異</h3>${table||'<p>兩套牌組卡號與張數相同。</p>'}`;
     $('compareDialog').showModal();
   }
@@ -91,7 +91,7 @@
     $('metaList').innerHTML=(m.leaders||[]).slice(0,30).map((v,i)=>{
       const row=results.find(r=>r.leaderId===v.leaderId);
       const pct=Math.min(100,Math.max(0,v.topCutShare||0));
-      return `<div class="metaRow"><strong>#${i+1}</strong><div><b>${enc(row?.leaderName||v.leaderId)}</b><span>${enc(v.leaderId)} · 冠軍 ${v.championCount||0} 次 · 前八 ${v.topCutCount} 次</span><div class="metaBar"><div style="width:${pct}%"></div></div><small class="note">分子 ${v.numerator} / 分母 ${v.denominator}（已收錄前八）</small></div><strong>${pct.toFixed(1)}%</strong></div>`;
+      return `<div class="metaRow"><strong>#${i+1}</strong><div><b class="cardTextTrigger" data-card-detail="${enc(v.leaderId)}" role="button" tabindex="0">${enc(row?.leaderName||v.leaderId)}</b><span>${enc(v.leaderId)} · 冠軍 ${v.championCount||0} 次 · 前八 ${v.topCutCount} 次</span><div class="metaBar"><div style="width:${pct}%"></div></div><small class="note">分子 ${v.numerator} / 分母 ${v.denominator}（已收錄前八）</small></div><strong>${pct.toFixed(1)}%</strong></div>`;
     }).join('')||'<div class="panel">這個期間／地區尚無已收錄的前八結果。</div>';
     if(m.sampleWarning)$('metaStatus').textContent+=' 樣本不足 20 筆，排名僅供參考。';
     if(m.formatWarning)$('metaStatus').textContent+=' 部分來源未提供賽制／禁限卡版本，不能據此比較不同環境的強度。';
