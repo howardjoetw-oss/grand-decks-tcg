@@ -1,0 +1,295 @@
+name: GRAND DECKS - Apply v13.1 Japanese card editions
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+
+jobs:
+  upgrade-v13-1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout existing main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify existing v13 and apply v13.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f public/index.html
+          test -f public/app.js
+          test -f public/results.js
+          test -f public/data/cards.json
+          test -f public/data/printings.json
+          grep -q 'v13.0' public/index.html
+          python - <<'PY'
+          #!/usr/bin/env python3
+          """Safely upgrade an existing GRAND DECKS v13 main checkout to v13.1.
+
+          No new Cloudflare project, no card collection deletion, no workflow edits.
+          The accompanying GitHub Actions workflow runs this file inline; this standalone
+          copy is for review and offline patch tests.
+          """
+          from pathlib import Path
+          import sys
+
+          ROOT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
+
+
+          def change_exact(text: str, old: str, new: str, name: str) -> str:
+              n = text.count(old)
+              if n != 1:
+                  raise RuntimeError(f'{name}: expected exactly one patch target, found {n}: {old[:110]!r}')
+              return text.replace(old, new, 1)
+
+
+          new_printings_js = r'''const PRINTINGS_URL = './data/printings.json';
+          let printingsRequest = null;
+          let jpPrintingsByCard = null;
+          // The Japanese variant gallery intentionally excludes regional duplicates and text-only entries.
+          // These are image links hosted by the official JP card site, not mirrored assets.
+          const JP_CARD_IMAGE = /^https:\/\/(?:www|jp)\.onepiece-cardgame\.com\/images\/cardlist\/card\/[a-z0-9_-]+\.(?:png|jpe?g|webp)(?:\?[^"'<>]*)?$/i;
+          function isJapaneseImageVersion(v) {
+           return v && String(v.locale||'').toLowerCase()==='jp' && JP_CARD_IMAGE.test(String(v.image||''));
+          }
+          function japaneseVersions(cardId) {
+           const records=jpPrintingsByCard?.[cardId]||[];
+           const unique=new Map();
+           for(const v of records){
+            if(!isJapaneseImageVersion(v))continue;
+            const image=String(v.image).split('?')[0].toLowerCase();
+            if(!unique.has(image))unique.set(image,v);
+           }
+           return [...unique.values()];
+          }
+          function rarityCode(raw) {
+           const value=String(raw||'').trim();
+           const codes={leader:'L',common:'C',uncommon:'UC',rare:'R',superrare:'SR',secretrare:'SEC',special:'SP',promo:'P',treasurerare:'TR',don:'DON!!'};
+           return codes[value.replace(/[\s_-]/g,'').toLowerCase()]||value.toUpperCase()||'—';
+          }
+          function versionKind(raw) {
+           const kind=String(raw||'').toLowerCase();
+           return ({normal:'base',original:'base',alternate:'parallel',altart:'parallel',alt:'parallel',specialart:'special'})[kind]||kind||'unknown';
+          }
+          function japaneseVersionKindLabel(raw) {
+           const kind=versionKind(raw);
+           return ({base:'一般版',parallel:'平行／異圖',reprint:'復刻版',special:'特殊版',manga:'漫畫版',promo:'宣傳版',unknown:'其他版本'})[kind]||'其他版本';
+          }
+          async function fetchPrintingsOnce() {
+           if(!printingsRequest){
+            printingsRequest=fetchJson(PRINTINGS_URL+'?v='+Date.now()).then(data=>{
+             if(!data?.byCard||typeof data.byCard!=='object')throw Error('日版卡面資料格式無效');
+             jpPrintingsByCard=data.byCard;
+             return data;
+            }).catch(err=>{printingsRequest=null;throw err;});
+           }
+           return printingsRequest;
+          }
+          function updateJapaneseVersionCount(panel) {
+           if(!panel)return;
+           const count=panel.querySelectorAll('.printingCard').length;
+           const label=panel.querySelector('[data-jp-count]');
+           if(label)label.textContent=String(count);
+           if(!count&&!panel.querySelector('.jpNoPrintings')){
+            const gallery=panel.querySelector('.printingsGrid');
+            if(gallery)gallery.insertAdjacentHTML('afterend','<p class="jpNoPrintings tiny">此卡目前沒有可正常顯示的日版卡圖。</p>');
+           }
+          }
+          window.grandJapaneseImageFailed=function(img){
+           const panel=img?.closest('#cardPrintingsPanel');
+           img?.closest('.printingCard')?.remove();
+           updateJapaneseVersionCount(panel);
+          };
+          async function showCardPrintings(cardId) {
+           const panel=document.getElementById('cardPrintingsPanel');
+           if(!panel||panel.dataset.cardId!==cardId)return;
+           try {
+            await fetchPrintingsOnce();
+            const current=document.getElementById('cardPrintingsPanel');
+            if(!current||current.dataset.cardId!==cardId||!$('#cardDialog').open)return;
+            // A print must have an actual official JP image URL; failed images remove their ENTIRE card.
+            const versions=japaneseVersions(cardId);
+            current.innerHTML=`<h3>卡面與印刷版本（日版）· <span data-jp-count>${versions.length}</span> 款</h3>`+
+              (versions.length?'<p class="tiny">僅展示日本版有卡圖的印刷版本。同卡號異圖不增加組牌可用張數。</p><div class="printingsGrid">'+
+                versions.map(v=>{
+                 const url=String(v.image||'');
+                 const id=String(v.printId||cardId);
+                 const title=`${id} · 日文版`;
+                 return `<div class="printingCard"><a target="_blank" rel="noopener noreferrer" href="${safe(url)}"><img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandJapaneseImageFailed(this)"></a><strong>${safe(id)}</strong><small><span class="jpRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(japaneseVersionKindLabel(v.kind))} · 日版</small></div>`;
+                }).join('')+'</div>':'<p class="jpNoPrintings tiny">此卡目前沒有可顯示的日版卡圖。</p>')+
+              '<p class="tiny">日版圖片僅連結官方來源；資料索引由 <a href="https://github.com/hotavocado/koala-kollect-data" target="_blank" rel="noopener noreferrer">Koala Kollect（CC BY 4.0）</a> 提供。各種稀有度以來源資料為準。</p>';
+           }catch(err){
+            const current=document.getElementById('cardPrintingsPanel');
+            if(current&&current.dataset.cardId===cardId)current.textContent='目前無法讀取日版版本資料，原有卡牌與牌組不受影響。';
+           }
+          }
+          '''
+
+
+          def build():
+              app_path=ROOT/'public/app.js'
+              html_path=ROOT/'public/index.html'
+              css_path=ROOT/'public/style.css'
+              release_path=ROOT/'public/version-history.js'
+              sw_path=ROOT/'public/sw.js'
+              for p in (app_path,html_path,css_path,release_path,sw_path):
+                  if not p.is_file():raise FileNotFoundError(f'Missing v13 file: {p}')
+
+              original={p:p.read_text(encoding='utf-8') for p in (app_path,html_path,css_path,release_path,sw_path)}
+              app,html,css,release,sw=[original[p] for p in original]
+              if 'v13.1' in html or "const JP_CARD_IMAGE" in app:
+                  raise RuntimeError('v13.1 seems already applied; no repeat upgrade')
+              if 'v13.0' not in html or 'const PRINTINGS_URL' not in app:
+                  raise RuntimeError('Expected GRAND DECKS v13.0 baseline; refusing to change unknown version')
+
+              first=app.index("const PRINTINGS_URL = './data/printings.json';")
+              last=app.index('const DEMO_PEOPLE=',first)
+              if 'async function showCardPrintings(cardId)' not in app[first:last]:
+                  raise RuntimeError('v13 gallery function was not found; cannot patch')
+              app=app[:first]+new_printings_js+'\n'+app[last:]
+
+              # Fix double-escaped card names while retaining safe HTML encoding on output.
+              app=change_exact(app,
+                'function safe(v){return String(v??\'\').replace(/[&<>"\']/g,ch=>({\'&\':\'&amp;\',\'<\':\'&lt;\',\'>\':\'&gt;\',\'"\':\'&quot;\',"\'":\'&#39;\'}[ch]));}',
+                '''function displayCardText(v){return String(v??'').replace(/&(?:amp|quot|apos|lt|gt|#39);/gi,entity=>({'&amp;':'&','&quot;':'"','&apos;':"'",'&lt;':'<','&gt;':'>','&#39;':"'"}[entity.toLowerCase()]||entity));}
+          function safe(v){return displayCardText(v).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}''',
+                'HTML entity display')
+              app=change_exact(app,'return {id,name:String(raw.name||raw.card_name||id),','return {id,name:displayCardText(raw.name||raw.card_name||id),','card-name normalization')
+
+              # Add rarity and JP version criteria to catalogue filters; deck rules stay canonical.
+              start=app.index('function cardMatches(c){')
+              end=app.index('\nfunction renderCards(){',start)
+              card_matches='''function cardMatches(c){
+           const q=$('#cardSearch').value.trim().toLowerCase(),color=$('#colorFilter').value,type=$('#typeFilter').value,set=$('#setFilter').value;
+           const rarity=$('#rarityFilter').value,kind=$('#printingKindFilter').value;
+           const jp=(rarity||kind)?japaneseVersions(c.id):[];
+           return (!q||[c.name,c.id,c.effect,c.pack_id].some(v=>displayCardText(v).toLowerCase().includes(q)))
+             &&(!color||c.colors.includes(color))&&(!type||c.category===type)&&(!set||c.pack_id===set)
+             &&(!rarity||rarityCode(c.rarity)===rarity||jp.some(v=>rarityCode(v.rarity)===rarity))
+             &&(!kind||jp.some(v=>versionKind(v.kind)===kind));
+          }'''
+              app=app[:start]+card_matches+app[end:]
+              app=change_exact(app,
+                  "function renderCards(){const matched=cards.filter(cardMatches);",
+                  "function renderCards(){if($('#printingKindFilter').value&&!jpPrintingsByCard){$('#cardCount').textContent='日版卡面索引載入中…';$('#cardGrid').innerHTML='<p class=\"note\">正在讀取日版印刷版本資料…</p>';$('#moreCards').hidden=true;return;}const matched=cards.filter(cardMatches);",
+                  'card filter loading indicator')
+              app=change_exact(app,
+                  "['#cardSearch','#colorFilter','#typeFilter','#setFilter'].forEach(id=>$(id).addEventListener(id==='#cardSearch'?'input':'change',()=>{shownCards=72;renderCards();}));",
+                  "['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter'].forEach(id=>$(id).addEventListener(id==='#cardSearch'?'input':'change',()=>{shownCards=72;renderCards();if((id==='#rarityFilter'||id==='#printingKindFilter')&&!jpPrintingsByCard)fetchPrintingsOnce().then(()=>{if(currentPage==='cards')renderCards();}).catch(()=>{if(currentPage==='cards'){ $('#cardCount').textContent='日版版本資料載入失敗';$('#cardGrid').innerHTML='<p class=\"note\">無法取得日版版本資料；請稍後重新選擇篩選條件。</p>';}});}));",
+                  'filter event binding')
+
+              index_anchor='<select id="setFilter" aria-label="系列"><option value="">全部系列</option></select></div>'
+              new_filters='''<select id="setFilter" aria-label="系列"><option value="">全部系列</option></select><select id="rarityFilter" aria-label="稀有度"><option value="">全部稀有度</option><option value="L">L 領航員</option><option value="C">C 普通</option><option value="UC">UC 非普通</option><option value="R">R 稀有</option><option value="SR">SR 超稀有</option><option value="SEC">SEC 秘密稀有</option><option value="SP">SP 特殊</option><option value="TR">TR 特別稀有</option><option value="P">P 宣傳卡</option><option value="DON!!">DON!!</option></select><select id="printingKindFilter" aria-label="日版印刷版本"><option value="">全部日版印刷版本</option><option value="base">一般版</option><option value="parallel">平行／異圖</option><option value="reprint">復刻版</option><option value="special">特殊版</option><option value="manga">漫畫版（依來源標記）</option><option value="promo">宣傳版</option></select></div>'''
+              html=change_exact(html,index_anchor,new_filters,'add catalogue filter selects')
+              # This class is local to the card search so meta and results filters are unchanged.
+              html=change_exact(html,'<section class="page" id="page-cards">','<section class="page" id="page-cards">','card section marker') if False else html
+              target='<div class="filters"><input id="cardSearch"'
+              html=change_exact(html,target,'<div class="filters cardFilters"><input id="cardSearch"','scoped filter layout')
+              if html.count('v13.0')<1:raise RuntimeError('Unexpected v13 version marker')
+              html=html.replace('v=13.0','v=13.1').replace('v13.0','v13.1')
+
+              css+='''
+          /* v13.1 Japanese-only version gallery and compact catalogue filters */
+          .cardFilters{grid-template-columns:repeat(3,minmax(0,1fr))}
+          .cardFilters #cardSearch{grid-column:1/-1}
+          .printingCard .jpRarity{color:var(--gold);font-weight:850;letter-spacing:.025em}
+          @media(max-width:1000px){.cardFilters{grid-template-columns:repeat(2,minmax(0,1fr))}.cardFilters #setFilter{grid-column:auto}}
+          @media(max-width:760px){.cardFilters{grid-template-columns:repeat(2,minmax(0,1fr))}.cardFilters #cardSearch{grid-column:1/-1}.cardFilters #setFilter{grid-column:auto}}
+          '''
+              new_release="""    {version:'13.1', date:'2026-11-23', status:'正式改版', title:'日版卡圖與精準篩選', changes:[
+                '卡面與印刷版本僅顯示有可用圖片網址的日文版，失效卡圖移除整張版本卡片',
+                '展示來源稀有度 L、SR、SEC 等，新增卡牌稀有度及日版印刷版本篩選',
+                '修正卡名 HTML 實體顯示，延續 v13 所有組牌與賽事功能'
+              ]},
+          """
+              release=change_exact(release,'  const RELEASES = [\n','  const RELEASES = [\n'+new_release,'version history')
+              sw=change_exact(sw,"const CACHE='grand-decks-shell-v13-printings-1';","const CACHE='grand-decks-shell-v13-1-jp-gallery-1';",'PWA cache version')
+
+              # Only write after all anchors have passed their validation.
+              updates={app_path:app,html_path:html,css_path:css,release_path:release,sw_path:sw}
+              for path,content in updates.items():
+                  path.write_text(content,encoding='utf-8')
+              print('Applied GRAND DECKS v13.1 patch to:', ', '.join(p.name for p in updates))
+
+
+          if __name__=='__main__':build()
+          PY
+      - name: Run regressions and JavaScript syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node --check public/app.js
+          node --check public/results.js
+          node --check public/version-history.js
+          node --check public/sw.js
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('public/index.html').read_text('utf-8')
+          app=Path('public/app.js').read_text('utf-8')
+          assert 'v13.1' in html and 'v13.0' not in html
+          assert 'id="rarityFilter"' in html and 'id="printingKindFilter"' in html
+          assert 'const JP_CARD_IMAGE' in app
+          assert 'window.grandJapaneseImageFailed' in app
+          assert "locale||''" in app
+          assert Path('public/results.js').exists()
+          assert Path('public/data/cards.json').exists()
+          assert Path('public/data/printings.json').exists()
+          print('v13.1 UI, JP-only gallery, and existing sources verified')
+          PY
+          node <<'JS'
+          'use strict';
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const src=fs.readFileSync('public/app.js','utf8');
+          const a=src.indexOf('const JP_CARD_IMAGE = ');
+          const b=src.indexOf('async function fetchPrintingsOnce()',a);
+          assert(a>0 && b>a);
+          const checks=src.slice(a,b);
+          const mock={
+            'OP01-001':[
+              {locale:'jp',image:'https://www.onepiece-cardgame.com/images/cardlist/card/OP01-001.png',rarity:'L',kind:'base'},
+              {locale:'jp',image:'https://www.onepiece-cardgame.com/images/cardlist/card/OP01-001_p1.png',rarity:'L',kind:'parallel'},
+              {locale:'en',image:'https://en.onepiece-cardgame.com/images/cardlist/card/OP01-001.png',rarity:'L',kind:'base'},
+              {locale:'jp',image:'',rarity:'L',kind:'parallel'}
+            ]
+          };
+          const scope={};
+          vm.runInNewContext('let jpPrintingsByCard='+JSON.stringify(mock)+';\n'+checks+'\nglobalThis.exports={japaneseVersions,rarityCode,versionKind};',scope);
+          const f=scope.exports;
+          assert.equal(f.japaneseVersions('OP01-001').length,2,'JP images only');
+          assert.equal(f.rarityCode('Leader'),'L');
+          assert.equal(f.rarityCode('SuperRare'),'SR');
+          assert.equal(f.rarityCode('SecretRare'),'SEC');
+          assert.equal(f.versionKind('parallel'),'parallel');
+          console.log('JP image filtering, rarity labels and variant type regression tests passed');
+          JS
+
+      - name: Commit only tested v13.1 website files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/index.html public/style.css public/version-history.js public/sw.js
+          if git diff --cached --quiet; then
+            echo 'No changes needed.'
+            exit 0
+          fi
+          git commit -m 'feat: GRAND DECKS v13.1 Japanese printings and rarity filters'
+          git push origin HEAD:main
+          echo 'v13.1 committed to original main. Check existing Cloudflare Pages production deploy.'
