@@ -1,0 +1,170 @@
+name: GRAND DECKS - Fix v13.2 Japanese artwork loading
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/APPLY_GRAND_DECKS_V13_2.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Safely patch existing v13.1
+        run: |
+          set -euo pipefail
+          grep -q 'v13.1' public/index.html
+          python - <<'PY'
+          from pathlib import Path
+          root = Path.cwd()
+          jsfile = root/"public/app.js"
+          htmlfile = root/"public/index.html"
+          swfile = root/"public/sw.js"
+          histfile = root/"public/version-history.js"
+          for file in (jsfile,htmlfile,swfile,histfile,root/"public/data/printings.json",root/"public/results.js"):
+              assert file.exists(), f"Missing essential v13.1 file: {file}"
+
+          js = jsfile.read_text("utf-8")
+          assert "const JP_CARD_IMAGE" in js and "async function showCardPrintings(cardId)" in js, "v13.1 Japanese card gallery missing"
+          assert js.count("function updateJapaneseVersionCount(panel) {") == 1, "Gallery updater changed; stop to prevent corruption"
+          assert js.count("window.grandJapaneseImageFailed=function(img){") == 1, "Image error handler changed"
+          assert js.count('const versions=japaneseVersions(cardId);') == 1, "Version selector changed"
+
+          a = js.index("function updateJapaneseVersionCount(panel) {")
+          b = js.index("async function showCardPrintings(cardId) {",a)
+          replace = r"""function updateJapaneseVersionCount(panel) {
+           if(!panel)return;
+           const available=panel.querySelectorAll('.printingCard').length;
+           const recorded=Number(panel.dataset.jpSourceCount||available);
+           const countLabel=panel.querySelector('[data-jp-count]');
+           if(countLabel)countLabel.textContent=String(available);
+           const sourceLabel=panel.querySelector('[data-jp-source-count]');
+           if(sourceLabel)sourceLabel.textContent=String(recorded);
+           let notice=panel.querySelector('.jpNoPrintings');
+           if(!available){
+            const message=recorded
+             ? `已收錄 ${recorded} 款日版卡面，但目前沒有成功載入圖片。這是圖片連線問題，不代表卡庫沒有版本。`
+             : '目前日版資料來源沒有可顯示的卡面紀錄。';
+            if(!notice){
+             const grid=panel.querySelector('.printingsGrid');
+             if(grid){grid.insertAdjacentHTML('afterend','<p class="jpNoPrintings tiny"></p>');notice=panel.querySelector('.jpNoPrintings');}
+            }
+            if(notice){
+             notice.textContent=message+' ';
+             const link=document.createElement('a');
+             link.href='https://www.onepiece-cardgame.com/cardlist/';
+             link.target='_blank';link.rel='noopener noreferrer';
+             link.textContent='查看日文官方卡表';
+             notice.appendChild(link);
+            }
+           }else if(notice)notice.remove();
+          }
+          window.grandJapaneseImageFailed=function(img){
+           const panel=img?.closest('#cardPrintingsPanel');
+           img?.closest('.printingCard')?.remove();
+           updateJapaneseVersionCount(panel);
+          };
+          window.grandJapaneseImageRetry=function(img){
+           if(!img||!img.isConnected)return;
+           // Some card hosts block cross-site image requests with a Referer header.
+           // Retry the identical official Japanese URL without Referer, once only.
+           if(img.dataset.jpRetry!=='1'){
+            img.dataset.jpRetry='1';
+            img.referrerPolicy='no-referrer';
+            const url=String(img.getAttribute('src')||'');
+            if(JP_CARD_IMAGE.test(url)){
+             const sep=url.includes('?')?'&':'?';
+             img.src=url+sep+'gd_jp_retry=1';
+             return;
+            }
+           }
+           window.grandJapaneseImageFailed(img);
+          };
+          """
+          js = js[:a]+replace+js[b:]
+          js = js.replace(
+           "current.innerHTML=`<h3>卡面與印刷版本（日版）· <span data-jp-count>${versions.length}</span> 款</h3>`+",
+           "current.dataset.jpSourceCount=String(versions.length);\n  current.innerHTML=`<h3>卡面與印刷版本（日版）· <span data-jp-count>${versions.length}</span> 款可顯示 <small class=\"jpSourceCount\">（來源收錄 <span data-jp-source-count>${versions.length}</span> 款）</small></h3>`+"
+          )
+          old_img = '<img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandJapaneseImageFailed(this)">'
+          new_img = '<img loading="lazy" decoding="async" referrerpolicy="no-referrer" data-jp-retry="0" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandJapaneseImageRetry(this)">'
+          assert js.count(old_img)==1, "Image tag changed: cannot apply safe patch"
+          js=js.replace(old_img,new_img)
+          assert js.count("window.grandJapaneseImageRetry(this)")==1
+          jsfile.write_text(js,"utf-8")
+
+          html=htmlfile.read_text("utf-8")
+          assert "v13.1" in html and "v13.2" not in html
+          html=html.replace("v13.1","v13.2")
+          htmlfile.write_text(html,"utf-8")
+
+          sw=swfile.read_text("utf-8")
+          assert "grand-decks-shell-v13-1-jp-gallery-1" in sw
+          sw=sw.replace("grand-decks-shell-v13-1-jp-gallery-1","grand-decks-shell-v13-2-jp-image-retry-1")
+          swfile.write_text(sw,"utf-8")
+
+          hist=histfile.read_text("utf-8")
+          assert "const RELEASES = [" in hist and "version:'13.1'" in hist
+          hist=hist.replace("  const RELEASES = [",
+           """  const RELEASES = [
+              {version:'13.2', date:'2026-11-23', status:'修正', title:'日版卡圖載入修正', changes:[
+                '日文版卡圖要求不傳送 Referer，載入失敗時再嘗試一次官方圖片網址',
+                '清楚區分已收錄日版版本數量與成功顯示的卡圖數量',
+                '無圖片版本不佔格子，但不再把載入失敗誤認成資料庫缺卡'
+              ]},""",1)
+          histfile.write_text(hist,"utf-8")
+          print("Patched existing GRAND DECKS v13.1 to v13.2 without altering card data, tournament results, or personal deck storage")
+          PY
+      - name: Test data integrity and front-end scripts
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node --check public/app.js
+          node --check public/results.js
+          node --check public/version-history.js
+          node --check public/sw.js
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('public/data/printings.json')
+          source=json.loads(p.read_text('utf-8'))
+          printings=source['byCard'].get('OP01-001',[])
+          jp=[v for v in printings if v.get('locale')=='jp' and v.get('image','').startswith('https://www.onepiece-cardgame.com/images/cardlist/card/')]
+          assert len(jp)>=3, f'Expected known JP printings; found {len(jp)}'
+          app=Path('public/app.js').read_text('utf-8')
+          html=Path('public/index.html').read_text('utf-8')
+          assert 'v13.2' in html
+          assert 'window.grandJapaneseImageRetry' in app
+          assert 'referrerpolicy="no-referrer"' in app
+          assert 'jpSourceCount' in app
+          assert Path('public/results.js').exists()
+          assert Path('public/data/cards.json').exists()
+          print('Checked: OP01-001 Japanese source printings:',len(jp))
+          print('Only UI, image request behavior, cache and release history were modified.')
+          PY
+      - name: Commit only five website files
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/index.html public/sw.js public/version-history.js
+          if git diff --cached --quiet; then
+            echo 'Nothing to commit'
+            exit 0
+          fi
+          git commit -m 'fix: GRAND DECKS v13.2 JP artwork loading and honest counts'
+          git pull --rebase origin main
+          git push origin HEAD:main
