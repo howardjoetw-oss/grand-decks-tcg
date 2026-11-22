@@ -1,0 +1,272 @@
+name: GRAND DECKS - Apply v13.3 zh-TW artwork (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+jobs:
+  update-v13-3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Read existing production source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Set up free test environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply or safely skip v13.3 update
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          #!/usr/bin/env python3
+          """GRAND DECKS v13.3: restore working zh-TW printed artwork (idempotent, no data changes)."""
+          from pathlib import Path
+          import json
+
+          ROOT=Path.cwd()
+          app_file=ROOT/'public/app.js'
+          html_file=ROOT/'public/index.html'
+          css_file=ROOT/'public/style.css'
+          sw_file=ROOT/'public/sw.js'
+          history_file=ROOT/'public/version-history.js'
+          for p in (app_file, html_file, css_file, sw_file, history_file, ROOT/'public/results.js', ROOT/'public/data/printings.json'):
+              if not p.exists(): raise SystemExit(f'FAIL: Missing required site file: {p}')
+          app=app_file.read_text('utf-8')
+          html=html_file.read_text('utf-8')
+          css=css_file.read_text('utf-8')
+          sw=sw_file.read_text('utf-8')
+          history=history_file.read_text('utf-8')
+
+          # Re-runs succeed harmlessly rather than showing a red failure after the first successful upgrade.
+          if 'v13.3 · 更新紀錄' in html:
+              assert 'const TW_CARD_IMAGE' in app and 'taiwanVersions(c.id)' in app, 'v13.3 label present without its code'
+              print('GRAND DECKS v13.3 is already installed. No modifications needed.')
+              raise SystemExit(0)
+          if 'v13.2 · 更新紀錄' not in html: raise SystemExit('FAIL: Not v13.2. Will not overwrite an unexpected version.')
+
+          source=json.loads((ROOT/'public/data/printings.json').read_text('utf-8'))
+          examples=[v for v in source.get('byCard',{}).get('OP01-001',[]) if v.get('locale')=='zh-TW' and str(v.get('image','')).startswith('https://asia-tw.onepiece-cardgame.com/images/cardlist/card/')]
+          if len(examples)<3: raise SystemExit(f'FAIL: Expected >=3 zh-TW OP01-001 source images; got {len(examples)}')
+
+          # The v13.2 gallery implementation is intentionally completely replaced. No card/deck data is touched.
+          start_marker="const PRINTINGS_URL = './data/printings.json';"
+          end_marker='const DEMO_PEOPLE='
+          assert app.count(start_marker)==1 and app.count(end_marker)==1
+          start=app.index(start_marker)
+          end=app.index(end_marker,start)
+          new_gallery=r'''const PRINTINGS_URL = './data/printings.json';
+          let printingsRequest = null;
+          let twPrintingsByCard = null;
+          // Taiwan Traditional Chinese edition artworks, as used in v13.0. Do not mix in JP/EN duplicates.
+          const TW_CARD_IMAGE = /^https:\/\/(?:asia-tw|asia-tc)\.onepiece-cardgame\.com\/images\/cardlist\/card\/[a-z0-9_-]+\.(?:png|jpe?g|webp)(?:\?[^"'<>]*)?$/i;
+          function isTaiwanImageVersion(v) {
+           return !!v && String(v.locale||'').toLowerCase()==='zh-tw' && TW_CARD_IMAGE.test(String(v.image||''));
+          }
+          function taiwanVersions(cardId) {
+           const rows=twPrintingsByCard?.[cardId]||[];
+           const unique=new Map();
+           for(const v of rows) {
+            if(!isTaiwanImageVersion(v))continue;
+            // Remove only identical image duplicates, not distinct parallel artwork.
+            const image=String(v.image).split('?')[0].toLowerCase();
+            if(!unique.has(image))unique.set(image,v);
+           }
+           return [...unique.values()].sort((a,b)=>(a.kind==='base'?0:1)-(b.kind==='base'?0:1)||String(a.printId).localeCompare(String(b.printId),'zh-TW',{numeric:true}));
+          }
+          function rarityCode(raw) {
+           const value=String(raw||'').trim();
+           const codes={leader:'L',common:'C',uncommon:'UC',rare:'R',superrare:'SR',secretrare:'SEC',special:'SP',promo:'P',treasurerare:'TR',don:'DON!!'};
+           return codes[value.replace(/[\s_-]/g,'').toLowerCase()]||value.toUpperCase()||'—';
+          }
+          function versionKind(raw) {
+           const kind=String(raw||'').toLowerCase();
+           return ({normal:'base',original:'base',alternate:'parallel',altart:'parallel',alt:'parallel',specialart:'special'})[kind]||kind||'unknown';
+          }
+          function taiwanVersionKindLabel(raw) {
+           const kind=versionKind(raw);
+           return ({base:'一般版',parallel:'平行／異圖',reprint:'復刻版',special:'特殊版',manga:'漫畫版',promo:'宣傳版',unknown:'其他版本'})[kind]||'其他版本';
+          }
+          async function fetchPrintingsOnce() {
+           if(!printingsRequest){
+            printingsRequest=fetchJson(PRINTINGS_URL+'?v='+Date.now()).then(data=>{
+             if(!data?.byCard||typeof data.byCard!=='object')throw Error('繁中卡面資料格式無效');
+             twPrintingsByCard=data.byCard;
+             return data;
+            }).catch(err=>{printingsRequest=null;throw err;});
+           }
+           return printingsRequest;
+          }
+          function updateTaiwanVersionCount(panel) {
+           if(!panel)return;
+           const available=panel.querySelectorAll('.printingCard').length;
+           const recorded=Number(panel.dataset.twSourceCount||available);
+           const label=panel.querySelector('[data-tw-count]');
+           if(label)label.textContent=String(available);
+           const source=panel.querySelector('[data-tw-source-count]');
+           if(source)source.textContent=String(recorded);
+           let note=panel.querySelector('.twNoPrintings');
+           if(!available){
+            if(!note){
+             const grid=panel.querySelector('.printingsGrid');
+             if(grid){grid.insertAdjacentHTML('afterend','<p class="twNoPrintings tiny"></p>');note=panel.querySelector('.twNoPrintings');}
+            }
+            if(note)note.textContent=recorded
+              ? `已收錄 ${recorded} 款繁中版卡面，但圖片載入失敗；這不表示資料庫沒有版本。`
+              : '目前沒有已收錄圖片網址的繁中版卡面。';
+           } else if(note)note.remove();
+          }
+          window.grandTaiwanImageFailed=function(img) {
+           const panel=img?.closest('#cardPrintingsPanel');
+           img?.closest('.printingCard')?.remove();
+           updateTaiwanVersionCount(panel);
+          };
+          async function showCardPrintings(cardId) {
+           const panel=document.getElementById('cardPrintingsPanel');
+           if(!panel||panel.dataset.cardId!==cardId)return;
+           try {
+            await fetchPrintingsOnce();
+            const current=document.getElementById('cardPrintingsPanel');
+            if(!current||current.dataset.cardId!==cardId||!$('#cardDialog').open)return;
+            const versions=taiwanVersions(cardId);
+            current.dataset.twSourceCount=String(versions.length);
+            current.innerHTML=`<h3>卡面與印刷版本（繁中）· <span data-tw-count>${versions.length}</span> 款 <small class="twSourceCount">（來源收錄 <span data-tw-source-count>${versions.length}</span> 款）</small></h3>`+
+             (versions.length?'<p class="tiny">僅顯示台灣繁體中文（zh-TW）有卡圖的版本；同卡號異圖不增加組牌可用張數。</p><div class="printingsGrid">'+
+              versions.map(v=>{
+               const url=String(v.image||'');
+               const id=String(v.printId||cardId);
+               const title=`${id} · 繁中版`;
+               return `<div class="printingCard"><a target="_blank" rel="noopener noreferrer" href="${safe(url)}"><img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandTaiwanImageFailed(this)"></a><strong>${safe(id)}</strong><small><span class="twRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(taiwanVersionKindLabel(v.kind))} · zh-TW</small></div>`;
+              }).join('')+'</div>':'<p class="twNoPrintings tiny">目前沒有已收錄圖片網址的繁中版卡面。</p>')+
+             '<p class="tiny">圖片直接連結台灣卡圖來源；版本索引來自 <a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records</a>。卡面與文字權利歸原權利人所有。</p>';
+           } catch(err){
+            const current=document.getElementById('cardPrintingsPanel');
+            if(current&&current.dataset.cardId===cardId)current.textContent='目前無法讀取繁中版本資料，原有卡牌與牌組不受影響。';
+           }
+          }
+
+          '''
+          app=app[:start]+new_gallery+app[end:]
+
+          # V13.1 filter logic must be converted too, not merely the card-detail gallery.
+          replacements={
+           "const jp=(rarity||kind)?japaneseVersions(c.id):[];":"const tw=(rarity||kind)?taiwanVersions(c.id):[];",
+           'jp.some(':'tw.some(',
+           'jpPrintingsByCard':'twPrintingsByCard',
+           '日版卡面索引載入中…':'繁中版卡面索引載入中…',
+           '正在讀取日版印刷版本資料…':'正在讀取繁中版印刷版本資料…',
+           '日版版本資料載入失敗':'繁中版版本資料載入失敗',
+           '無法取得日版版本資料；請稍後重新選擇篩選條件。':'無法取得繁中版版本資料；請稍後重新選擇篩選條件。',
+          }
+          for old,new in replacements.items():
+              if old not in app: raise SystemExit(f'FAIL: expected front-end filter anchor absent: {old}')
+              app=app.replace(old,new)
+          assert 'japaneseVersions' not in app and 'jpPrintingsByCard' not in app
+          assert app.count('const TW_CARD_IMAGE')==1 and app.count('function taiwanVersions(cardId)')==1
+          assert app.count('window.grandTaiwanImageFailed(this)')==1
+          assert app.count('const tw=(rarity||kind)?taiwanVersions(c.id):[];')==1
+
+          html=html.replace('v13.2 · 更新紀錄','v13.3 · 更新紀錄')
+          html=html.replace('v=13.1','v=13.3') # Deliberately cache-bust ALL 4 existing JS/CSS URLs.
+          html=html.replace('aria-label="日版印刷版本"','aria-label="繁中版印刷版本"')
+          html=html.replace('>全部日版印刷版本<','>全部繁中版印刷版本<')
+          assert html.count('v13.3 · 更新紀錄')==1 and '全部日版印刷版本' not in html
+          assert 'v=13.1' not in html
+
+          assert '.printingCard .jpRarity' in css
+          css=css.replace('.printingCard .jpRarity','.printingCard .twRarity')
+          css=css.replace('/* v13.1 Japanese-only version gallery and compact catalogue filters */','/* v13.3 zh-TW-only version gallery and compact catalogue filters */')
+          assert 'grand-decks-shell-v13-2-jp-image-retry-1' in sw
+          sw=sw.replace('grand-decks-shell-v13-2-jp-image-retry-1','grand-decks-shell-v13-3-zh-tw-editions-1')
+          assert 'const RELEASES = [' in history
+          history=history.replace('  const RELEASES = [', '''  const RELEASES = [
+              {version:'13.3', date:'2026-11-23', status:'卡面來源修正', title:'恢復台灣繁體中文版卡面', changes:[
+                '卡面與印刷版本改回 zh-TW 台灣繁體中文版來源，不再僅篩選日本版',
+                '保留同卡號的普通版、平行異圖與正確稀有度，無圖卡片不佔版面',
+                '修正印刷版本篩選標籤、網站快取版本，保留 v13.2 組牌及賽事資料'
+              ]},''',1)
+
+          # Write ONLY after all preconditions are satisfied.
+          for p,s in [(app_file,app),(html_file,html),(css_file,css),(sw_file,sw),(history_file,history)]:
+              p.write_text(s,'utf-8')
+          print('Updated to GRAND DECKS v13.3 (zh-TW artwork only). OP01-001 contains',len(examples),'source variants.')
+          PY
+      - name: Validate all existing functionality and new Taiwanese art filters
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node --check public/app.js
+          node --check public/results.js
+          node --check public/version-history.js
+          node --check public/sw.js
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('public')
+          app=(root/'app.js').read_text('utf-8')
+          html=(root/'index.html').read_text('utf-8')
+          css=(root/'style.css').read_text('utf-8')
+          assert html.count('v13.3 · 更新紀錄')==1
+          assert 'v=13.1' not in html
+          assert '全部繁中版印刷版本' in html
+          assert 'aria-label="繁中版印刷版本"' in html
+          assert 'const TW_CARD_IMAGE' in app
+          assert 'taiwanVersions(c.id)' in app
+          assert 'twPrintingsByCard' in app
+          assert 'japaneseVersions(' not in app
+          assert 'jpPrintingsByCard' not in app
+          assert 'window.grandTaiwanImageFailed(this)' in app
+          assert '.printingCard .twRarity' in css
+          assert 'grand-decks-shell-v13-3-zh-tw-editions-1' in (root/'sw.js').read_text('utf-8')
+          assert (root/'results.js').is_file() and (root/'data/cards.json').is_file()
+          rows=json.loads((root/'data/printings.json').read_text('utf-8'))['byCard']['OP01-001']
+          tw=[v for v in rows if v.get('locale')=='zh-TW' and v.get('image','').startswith('https://asia-tw.onepiece-cardgame.com/images/cardlist/card/')]
+          assert {v['printId'] for v in tw} >= {'OP01-001','OP01-001_p1','OP01-001_p2'}
+          print('v13.3 checked: three Taiwan OP01-001 art variants and preserved site files')
+          PY
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const code=fs.readFileSync('public/app.js','utf8');
+          const begin=code.indexOf("const PRINTINGS_URL = './data/printings.json';");
+          const end=code.indexOf('const DEMO_PEOPLE=',begin);
+          assert(begin>=0 && end>begin);
+          const sample=[
+           {cardId:'OP01-001', printId:'OP01-001',locale:'zh-TW',image:'https://asia-tw.onepiece-cardgame.com/images/cardlist/card/OP01-001.png?261016',rarity:'Leader',kind:'base'},
+           {cardId:'OP01-001', printId:'OP01-001_p1',locale:'zh-TW',image:'https://asia-tw.onepiece-cardgame.com/images/cardlist/card/OP01-001_p1.png?261016',rarity:'Leader',kind:'parallel'},
+           {cardId:'OP01-001', printId:'OP01-001_p2',locale:'zh-TW',image:'https://asia-tw.onepiece-cardgame.com/images/cardlist/card/OP01-001_p2.png?261016',rarity:'Leader',kind:'parallel'},
+           {cardId:'OP01-001', printId:'OP01-001_p2',locale:'en',image:'https://en.onepiece-cardgame.com/images/cardlist/card/OP01-001_p2.png',rarity:'Leader',kind:'parallel'},
+           {cardId:'OP01-001', printId:'OP01-001_p9',locale:'zh-TW',image:'',rarity:'Leader',kind:'parallel'}
+          ];
+          const context={window:{}};
+          vm.runInNewContext(code.slice(begin,end)+"\ntwPrintingsByCard={'OP01-001':"+JSON.stringify(sample)+"};globalThis.fn={taiwanVersions,rarityCode,versionKind};",context);
+          const result=context.fn.taiwanVersions('OP01-001');
+          assert.equal(result.length,3,'only 3 zh-TW images');
+          assert.deepEqual([...result].map(x=>x.printId),['OP01-001','OP01-001_p1','OP01-001_p2']);
+          assert.equal(context.fn.rarityCode('Leader'),'L');
+          assert.equal(context.fn.rarityCode('SuperRare'),'SR');
+          assert.equal(context.fn.versionKind('parallel'),'parallel');
+          console.log('PASS: 3 Taiwan art variants, parallel art, rarity, and exclusion of non-TW/empty URLs');
+          JS
+      - name: Commit only front-end files after passing tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/index.html public/style.css public/sw.js public/version-history.js
+          if git diff --cached --quiet; then
+            echo 'v13.3 already applied; green success, no new deployment needed.'
+            exit 0
+          fi
+          git commit -m 'fix: GRAND DECKS v13.3 restore zh-TW artwork variants'
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo 'v13.3 pushed to original project; check Cloudflare Pages production release.'
