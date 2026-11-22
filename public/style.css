@@ -113,9 +113,9 @@
 .printingCard small{color:var(--sub)}
 .printingNoImage{display:grid;place-items:center;aspect-ratio:5/7;color:var(--sub);border:1px dashed var(--line);text-align:center}
 
-/* v13.1 Japanese-only version gallery and compact catalogue filters */
+/* v13.3 zh-TW-only version gallery and compact catalogue filters */
 .cardFilters{grid-template-columns:repeat(3,minmax(0,1fr))}
 .cardFilters #cardSearch{grid-column:1/-1}
-.printingCard .jpRarity{color:var(--gold);font-weight:850;letter-spacing:.025em}
+.printingCard .twRarity{color:var(--gold);font-weight:850;letter-spacing:.025em}
 @media(max-width:1000px){.cardFilters{grid-template-columns:repeat(2,minmax(0,1fr))}.cardFilters #setFilter{grid-column:auto}}
 @media(max-width:760px){.cardFilters{grid-template-columns:repeat(2,minmax(0,1fr))}.cardFilters #cardSearch{grid-column:1/-1}.cardFilters #setFilter{grid-column:auto}}
