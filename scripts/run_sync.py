@@ -7,7 +7,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 from build_reports import atomic_json
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'public'/'data'
-JOBS=[('繁中卡牌索引',['sync_cards.py']),('Limitless Play',['sync_results.py','--days','45','--max-events','32']),
+JOBS=[('多語卡牌與全部印刷版本',['sync_full_catalogue.py']),('Limitless Play',['sync_results.py','--days','45','--max-events','32']),
       ('TOP DECKS 系列監看',['check_topdecks_sets.py']),('TOP DECKS 賽事摘要',['import_topdecks.py']),('社群 RSS',['sync_community.py'])]
 
 def main():
@@ -19,7 +19,7 @@ def main():
             results[name]={'status':'skipped','details':'離線模式未執行遠端取得'};continue
         command=[sys.executable,str(ROOT/'scripts'/cmd[0]),*cmd[1:]]
         try:
-            r=subprocess.run(command,text=True,capture_output=True,timeout=230,cwd=ROOT)
+            r=subprocess.run(command,text=True,capture_output=True,timeout=600,cwd=ROOT)
             results[name]={'status':'success' if r.returncode==0 else 'failed','details':((r.stderr or '')+' '+(r.stdout or ''))[-600:].strip()}
             if r.returncode==0 and any(word in results[name]['details'] for word in ['Skipped (robots','No approved community feeds','No valid full 50-card decklists','No approved readable feed']):results[name]['status']='skipped'
             print(name,results[name]['status'],results[name]['details'][:250])

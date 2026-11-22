@@ -7,6 +7,34 @@ const COLOR_MAP = {red:'Red',green:'Green',blue:'Blue',purple:'Purple',black:'Bl
 const TYPE_MAP={leader:'Leader',character:'Character',event:'Event',stage:'Stage',don:'Don',領航員:'Leader',領袖:'Leader',角色:'Character',事件:'Event',場景:'Stage'};
 const CARD_SNAPSHOT_URL = './data/cards.json';
 const SYNC_STATUS_URL = './data/sync-status.json';
+const PRINTINGS_URL = './data/printings.json';
+let printingsRequest = null;
+async function showCardPrintings(cardId) {
+ const panel=document.getElementById('cardPrintingsPanel');
+ if(!panel||panel.dataset.cardId!==cardId)return;
+ try {
+  if(!printingsRequest)printingsRequest=fetchJson(PRINTINGS_URL+'?v='+Date.now()).catch(err=>{printingsRequest=null;throw err;});
+  const data=await printingsRequest;
+  const current=document.getElementById('cardPrintingsPanel');
+  if(!current||current.dataset.cardId!==cardId||!$('#cardDialog').open)return;
+  const versions=data?.byCard?.[cardId]||[];
+  const labels={base:'一般版',parallel:'平行／異圖',reprint:'復刻版',special:'特別版',unknown:'其他版本'};
+  current.innerHTML=`<h3>卡面與印刷版本 · ${versions.length} 款</h3>`+
+    (versions.length?'<p class="tiny">同卡號的異圖不增加組牌可用張數；點選卡圖可查看來源圖片。</p><div class="printingsGrid">'+
+    versions.map(v=>{
+      const title=`${v.printId||cardId} · ${v.locale||''}`;
+      const url=String(v.image||'');
+      const usable=/^https:\/\/(?:[a-z0-9.-]+)\//i.test(url);
+      const picture=usable?`<a target="_blank" rel="noopener noreferrer" href="${safe(url)}"><img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="this.style.display='none'"></a>`:'<span class="printingNoImage">來源暫無圖片</span>';
+      return `<div class="printingCard">${picture}<strong>${safe(v.printId||cardId)}</strong><small>${safe(v.locale||'')} · ${safe(labels[v.kind]||v.kind||'其他')} · ${safe(v.rarity||'')}</small></div>`;
+    }).join('')+'</div>':'<p>這張卡目前尚無可驗證的印刷版本資料。</p>')+
+    '<p class="tiny">版本資料來源：<a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records</a>、<a href="https://github.com/hotavocado/koala-kollect-data" target="_blank" rel="noopener noreferrer">Koala Kollect（CC BY 4.0）</a>。圖片與卡面權利仍屬原權利人；清單不保證涵蓋尚未公開的版本。</p>';
+ } catch(err) {
+  const current=document.getElementById('cardPrintingsPanel');
+  if(current&&current.dataset.cardId===cardId)current.textContent='印刷版本資料尚未同步或暫時無法載入；既有卡牌與牌組不受影響。';
+ }
+}
+
 const DEMO_PEOPLE=['航行者','劍士','航海士','狙擊手','醫者','船匠','考古學者','音樂家','舵手','守衛者','探險家','船長','夥伴','戰略家','航路師'];
 const demoCards=(()=>{
   const a=[];
@@ -142,8 +170,9 @@ function openCard(id){
  const effectBlock=`<div class="cardDetailEffect" id="cardDetailEffectPanel" data-detail-id="${safe(c.id)}"><strong>卡牌效果</strong><p>${effectText}</p>${triggerBlock}</div>`;
  const inEditor=currentPage==='cards'||currentPage==='builder';
  const action=known&&inEditor?`<button class="primary" data-cardact="${c.category==='Leader'?'leader':'add'}" data-id="${safe(c.id)}">${c.category==='Leader'?'設為領航員':'加入目前牌組'}</button>`:'';
- $('#dialogBody').innerHTML=`<div class="dialogbody cardDetailLayout">${art(c)}<div class="cardDetailContent"><h2>${safe(c.name||c.id)}</h2><div class="colorDots">${dots(c)}</div>${record}${details}${effectBlock}${action}<p class="cardDetailFootnote">卡牌效果按需讀取自 <a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records 繁中資料</a>；美術、卡面及文字權利屬原權利人。若未授權使用請依來源規範處理。</p></div></div>`;
+ $('#dialogBody').innerHTML=`<div class="dialogbody cardDetailLayout">${art(c)}<div class="cardDetailContent"><h2>${safe(c.name||c.id)}</h2><div class="colorDots">${dots(c)}</div>${record}${details}${effectBlock}<div id="cardPrintingsPanel" data-card-id="${safe(c.id)}">正在讀取不同卡面版本…</div>${action}<p class="cardDetailFootnote">卡牌效果按需讀取自 <a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records 繁中資料</a>；美術、卡面及文字權利屬原權利人。若未授權使用請依來源規範處理。</p></div></div>`;
  const dlg=$('#cardDialog');if(!dlg.open)dlg.showModal();
+ showCardPrintings(c.id);
  if(shouldLoad){
    loadOfficialCardText(c).then(info=>{
      const panel=document.getElementById('cardDetailEffectPanel');
@@ -246,7 +275,7 @@ async function loadSyncStatus(){
     const label=({'updated':'內容有更新','unchanged':'已檢查、無新增','failed':'檢查失敗','never-run':'尚未首次同步'})[a.state]||'狀態未知';
     const t=status.topDecksSets||{};
     const tLabel=({'updated':'系列列表有更新','unchanged':'已檢查、無變更','failed':'檢查未成功','never-run':'尚未首次同步'})[t.state]||'尚未執行';
-    node.textContent=`卡牌索引：${label} · ${a.cardCount||0} 種卡號 · 上次檢查 ${a.checkedAt?new Date(a.checkedAt).toLocaleString('zh-TW'):'尚無'}。TOP DECKS 系列監看：${tLabel} · ${t.seriesCount||0} 項。${a.message||t.message||''}`;
+    node.textContent=`卡牌索引：${label} · ${a.cardCount||0} 種卡號 · ${a.printingCount||0} 個版本紀錄 · 上次檢查 ${a.checkedAt?new Date(a.checkedAt).toLocaleString('zh-TW'):'尚無'}。TOP DECKS 系列監看：${tLabel} · ${t.seriesCount||0} 項。${a.message||t.message||''}`;
     const sources=status.pipeline?.sources||{};const panel=$('#pipelineHealth');if(panel){const parts=Object.entries(sources).map(([name,v])=>`${name}：${({success:'成功',failed:'失敗',skipped:'略過'})[v.status]||'未知'}`);panel.textContent=parts.length?`最後執行 ${status.pipeline.lastAttempt?.slice(0,19).replace('T',' ')||'未知'} UTC。${parts.join('；')}。`: 'GitHub 尚未執行整合排程。';}
     try{const integrity=await fetchJson('./data/integrity.json?v='+Date.now());$('#integrityStatus').textContent=`結果 ${integrity.publishedResults} 筆、沒有完整牌表 ${integrity.missingFullDecklists} 筆、唯一構築 ${integrity.uniqueDeckFingerprints} 組；資料完整性檢查 ${integrity.checkedAt?.slice(0,10)||'未檢查'}。`;}catch{$('#integrityStatus').textContent='尚無資料完整性驗證快照。';}
   }catch(e){node.textContent='尚無法讀取雲端同步狀態；這不會清除已儲存的卡牌或私人牌組。';}

@@ -101,3 +101,14 @@
 .cardDetailEffect p{white-space:pre-line;overflow-wrap:anywhere}
 .effectSourceLabel{font-size:11px;color:var(--sub);display:block;margin-top:8px}
 @media(max-width:670px){.topbar{height:auto;min-height:76px;padding:10px 12px;gap:8px}.logo{gap:8px;flex-wrap:wrap}.logo strong{font-size:14px}.logo small{font-size:8px}.releaseChip{font-size:10px;padding:4px 8px}.topActions{gap:4px}.topActions .tag{font-size:10px;padding:4px 8px}.iconBtn{font-size:11px;padding:5px 8px}.versionList{padding:8px 14px 18px}}
+
+
+/* v13 distinct card printings gallery */
+#cardPrintingsPanel{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+#cardPrintingsPanel h3{font-size:16px;margin:0 0 10px}
+.printingsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px;margin:10px 0}
+.printingCard{min-width:0;border:1px solid var(--line);border-radius:9px;background:var(--shell);padding:7px;font-size:11px;overflow:hidden}
+.printingCard img{display:block;width:100%;aspect-ratio:5/7;object-fit:contain;border-radius:4px;background:#1a283e}
+.printingCard strong,.printingCard small{display:block;overflow-wrap:anywhere;margin-top:5px}
+.printingCard small{color:var(--sub)}
+.printingNoImage{display:grid;place-items:center;aspect-ratio:5/7;color:var(--sub);border:1px dashed var(--line);text-align:center}
