@@ -51,18 +51,51 @@ async function fetchPrintingsOnce() {
 }
 function updateJapaneseVersionCount(panel) {
  if(!panel)return;
- const count=panel.querySelectorAll('.printingCard').length;
- const label=panel.querySelector('[data-jp-count]');
- if(label)label.textContent=String(count);
- if(!count&&!panel.querySelector('.jpNoPrintings')){
-  const gallery=panel.querySelector('.printingsGrid');
-  if(gallery)gallery.insertAdjacentHTML('afterend','<p class="jpNoPrintings tiny">此卡目前沒有可正常顯示的日版卡圖。</p>');
- }
+ const available=panel.querySelectorAll('.printingCard').length;
+ const recorded=Number(panel.dataset.jpSourceCount||available);
+ const countLabel=panel.querySelector('[data-jp-count]');
+ if(countLabel)countLabel.textContent=String(available);
+ const sourceLabel=panel.querySelector('[data-jp-source-count]');
+ if(sourceLabel)sourceLabel.textContent=String(recorded);
+ let notice=panel.querySelector('.jpNoPrintings');
+ if(!available){
+  const message=recorded
+   ? `已收錄 ${recorded} 款日版卡面，但目前沒有成功載入圖片。這是圖片連線問題，不代表卡庫沒有版本。`
+   : '目前日版資料來源沒有可顯示的卡面紀錄。';
+  if(!notice){
+   const grid=panel.querySelector('.printingsGrid');
+   if(grid){grid.insertAdjacentHTML('afterend','<p class="jpNoPrintings tiny"></p>');notice=panel.querySelector('.jpNoPrintings');}
+  }
+  if(notice){
+   notice.textContent=message+' ';
+   const link=document.createElement('a');
+   link.href='https://www.onepiece-cardgame.com/cardlist/';
+   link.target='_blank';link.rel='noopener noreferrer';
+   link.textContent='查看日文官方卡表';
+   notice.appendChild(link);
+  }
+ }else if(notice)notice.remove();
 }
 window.grandJapaneseImageFailed=function(img){
  const panel=img?.closest('#cardPrintingsPanel');
  img?.closest('.printingCard')?.remove();
  updateJapaneseVersionCount(panel);
+};
+window.grandJapaneseImageRetry=function(img){
+ if(!img||!img.isConnected)return;
+ // Some card hosts block cross-site image requests with a Referer header.
+ // Retry the identical official Japanese URL without Referer, once only.
+ if(img.dataset.jpRetry!=='1'){
+  img.dataset.jpRetry='1';
+  img.referrerPolicy='no-referrer';
+  const url=String(img.getAttribute('src')||'');
+  if(JP_CARD_IMAGE.test(url)){
+   const sep=url.includes('?')?'&':'?';
+   img.src=url+sep+'gd_jp_retry=1';
+   return;
+  }
+ }
+ window.grandJapaneseImageFailed(img);
 };
 async function showCardPrintings(cardId) {
  const panel=document.getElementById('cardPrintingsPanel');
@@ -73,13 +106,14 @@ async function showCardPrintings(cardId) {
   if(!current||current.dataset.cardId!==cardId||!$('#cardDialog').open)return;
   // A print must have an actual official JP image URL; failed images remove their ENTIRE card.
   const versions=japaneseVersions(cardId);
-  current.innerHTML=`<h3>卡面與印刷版本（日版）· <span data-jp-count>${versions.length}</span> 款</h3>`+
+  current.dataset.jpSourceCount=String(versions.length);
+  current.innerHTML=`<h3>卡面與印刷版本（日版）· <span data-jp-count>${versions.length}</span> 款可顯示 <small class="jpSourceCount">（來源收錄 <span data-jp-source-count>${versions.length}</span> 款）</small></h3>`+
     (versions.length?'<p class="tiny">僅展示日本版有卡圖的印刷版本。同卡號異圖不增加組牌可用張數。</p><div class="printingsGrid">'+
       versions.map(v=>{
        const url=String(v.image||'');
        const id=String(v.printId||cardId);
        const title=`${id} · 日文版`;
-       return `<div class="printingCard"><a target="_blank" rel="noopener noreferrer" href="${safe(url)}"><img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandJapaneseImageFailed(this)"></a><strong>${safe(id)}</strong><small><span class="jpRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(japaneseVersionKindLabel(v.kind))} · 日版</small></div>`;
+       return `<div class="printingCard"><a target="_blank" rel="noopener noreferrer" href="${safe(url)}"><img loading="lazy" decoding="async" referrerpolicy="no-referrer" data-jp-retry="0" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandJapaneseImageRetry(this)"></a><strong>${safe(id)}</strong><small><span class="jpRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(japaneseVersionKindLabel(v.kind))} · 日版</small></div>`;
       }).join('')+'</div>':'<p class="jpNoPrintings tiny">此卡目前沒有可顯示的日版卡圖。</p>')+
     '<p class="tiny">日版圖片僅連結官方來源；資料索引由 <a href="https://github.com/hotavocado/koala-kollect-data" target="_blank" rel="noopener noreferrer">Koala Kollect（CC BY 4.0）</a> 提供。各種稀有度以來源資料為準。</p>';
  }catch(err){
