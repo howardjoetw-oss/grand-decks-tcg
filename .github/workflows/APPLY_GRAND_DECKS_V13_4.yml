@@ -1,0 +1,290 @@
+name: GRAND DECKS - Apply v13.4 catalogue display rules
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+
+jobs:
+  update-card-catalogue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout original GRAND DECKS main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Patch v13.3 to v13.4 (idempotent)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          #!/usr/bin/env python3
+          """GRAND DECKS v13.4: canonical 'all', individual zh-TW edition views.
+
+          Changes only public website UI files; leaves data, tournament records and
+          browser-stored user decklists intact. Idempotent on v13.4.
+          """
+          from pathlib import Path
+          import re
+          import sys
+
+          ROOT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
+          app = ROOT / 'public/app.js'
+          index = ROOT / 'public/index.html'
+          versions = ROOT / 'public/version-history.js'
+          sw = ROOT / 'public/sw.js'
+          for path in (app, index, versions, sw, ROOT/'public/results.js', ROOT/'public/data/printings.json'):
+              assert path.exists(), f'Missing existing site file: {path}'
+
+          html = index.read_text('utf-8')
+          if 'v13.4 · 更新紀錄' in html:
+              print('GRAND DECKS v13.4 is already installed: no repeated changes needed.')
+              sys.exit(0)
+          assert 'v13.3 · 更新紀錄' in html, 'Only the exact v13.3 baseline is supported; no changes applied.'
+
+          js = app.read_text('utf-8')
+          assert js.count('function cardMatches(c){') == 1
+          assert js.count('// All card images across the PWA') == 1
+          assert js.count("if(page==='cards')renderCards();") == 1
+          assert js.count("['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter'].forEach(") == 1
+          assert "function taiwanVersions(cardId)" in js
+
+          # The canonical (all cards) view has one tile per ID. Edition views are a true
+          # flattened list of distinct physical printings; never deduplicate by card ID.
+          new_gallery = r'''function cardMatches(c){
+           const q=$('#cardSearch').value.trim().toLowerCase();
+           const color=$('#colorFilter').value,type=$('#typeFilter').value,set=$('#setFilter').value;
+           return (!q||[c.name,c.id,c.effect,c.pack_id].some(v=>displayCardText(v).toLowerCase().includes(q)))
+             &&(!color||c.colors.includes(color))&&(!type||c.category===type)&&(!set||c.pack_id===set);
+          }
+          function catalogueEditionRows(){
+           const kind=$('#printingKindFilter').value;
+           const rarity=$('#rarityFilter').value;
+           const rows=[],seenIds=new Set();
+           for(const c of cards){
+            // The catalogue itself is canonical; defend against duplicate imported IDs.
+            if(!c?.id||seenIds.has(c.id)||!cardMatches(c))continue;
+            seenIds.add(c.id);
+            const editions=taiwanVersions(c.id);
+            if(!kind){
+             // "全部卡牌": one tile per original card number, using normal art first.
+             const base=editions.find(v=>versionKind(v.kind)==='base')||null;
+             if(rarity&&rarityCode(base?.rarity||c.rarity)!==rarity)continue;
+             rows.push({card:c,edition:base});
+            } else {
+             // A selected edition category is a flattened artwork catalogue. Same ID
+             // may appear repeatedly for different physical images/printing IDs.
+             for(const edition of editions){
+              if(versionKind(edition.kind)!==kind)continue;
+              if(rarity&&rarityCode(edition.rarity||c.rarity)!==rarity)continue;
+              rows.push({card:c,edition});
+             }
+            }
+           }
+           return rows;
+          }
+          function catalogueTileArt(card,edition,mode){
+           if(mode==='all'){
+            // Prefer zh-TW normal edition, then retain v13 normal-card fallbacks.
+            return art(edition?.image?{...card,image:edition.image}:card);
+           }
+           const image=String(edition?.image||'');
+           if(!TW_CARD_IMAGE.test(image))return '';
+           const label=String(edition.printId||card.id);
+           return `<div class="cardart"><span class="artText">${safe(label)}</span><img src="${safe(image)}" alt="${safe(card.name)} · ${safe(label)}" loading="lazy" decoding="async" onerror="window.grandCatalogueEditionFailed(this)"></div>`;
+          }
+          window.grandCatalogueEditionFailed=function(img){
+           // Do not replace a parallel/reprint with unrelated normal artwork.
+           img?.closest('.cardtile')?.remove();
+          };
+          function renderCards(){
+           const kind=$('#printingKindFilter').value;
+           if(kind&&!twPrintingsByCard){
+            $('#cardCount').textContent='繁中版卡面索引載入中…';
+            $('#cardGrid').innerHTML='<p class="note">正在讀取繁中版印刷版本資料…</p>';
+            $('#moreCards').hidden=true;
+            return;
+           }
+           const mode=kind||'all';
+           const matched=catalogueEditionRows();
+           $('#cardCount').textContent=matched.length.toLocaleString('zh-TW')+(kind?' 款卡面':' 張卡牌');
+           $('#cardGrid').innerHTML=matched.slice(0,shownCards).map(({card:c,edition:v})=>{
+            const image=catalogueTileArt(c,v,mode);
+            if(!image)return '';
+            const editionInfo=kind?`${v.printId||c.id} · ${rarityCode(v.rarity||c.rarity)} · ${taiwanVersionKindLabel(v.kind)}`:`${c.id} · ${rarityCode(v?.rarity||c.rarity)}`;
+            return `<button class="cardtile" data-card="${safe(c.id)}" data-print-id="${safe(v?.printId||c.id)}"><div class="coloredge" style="--edge:${cardColor(c)}"></div>${image}<div class="cardmeta"><strong title="${safe(c.name)}">${safe(c.name)}</strong><small>${safe(editionInfo)}</small></div></button>`;
+           }).join('')||'<div class="note">找不到符合條件的卡面。</div>';
+           $('#moreCards').hidden=matched.length<=shownCards;
+          }
+          '''
+          start=js.index('function cardMatches(c){')
+          end=js.index('// All card images across the PWA',start)
+          js=js[:start]+new_gallery+js[end:]
+
+          # Asynchronously warm up the printings index on card-gallery navigation. This
+          # doesn't delay the initial canonical view, and the previous JSON snapshot
+          # stays cached by the existing PWA logic.
+          old_nav="if(page==='cards')renderCards();"
+          new_nav="if(page==='cards'){renderCards();if(!twPrintingsByCard)fetchPrintingsOnce().then(()=>{if(currentPage==='cards')renderCards();}).catch(()=>{});}"
+          assert js.count(old_nav)==1
+          js=js.replace(old_nav,new_nav)
+
+          # The search, colour, type, set, rarity and edition controls all rerender from
+          # a single source of truth. Do not keep the old filtering-on-card-ID handler.
+          start=js.index("['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter'].forEach(")
+          end=js.index("\n $('#moreCards')",start)
+          js=js[:start]+'''['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter'].forEach(id=>{
+            $(id).addEventListener(id==='#cardSearch'?'input':'change',()=>{
+              shownCards=72;
+              renderCards();
+              if(!twPrintingsByCard)fetchPrintingsOnce().then(()=>{
+                if(currentPage==='cards')renderCards();
+              }).catch(()=>{
+                if($('#printingKindFilter').value&&currentPage==='cards'){
+                  $('#cardCount').textContent='繁中版卡面索引載入失敗';
+                  $('#cardGrid').innerHTML='<p class="note">無法取得繁中版版本資料；保留全部卡牌檢視功能。</p>';
+                }
+              });
+            });
+           });'''+js[end:]
+          app.write_text(js,'utf-8')
+
+          # Exactly the four user-specified options. No hidden special/manga/promo items.
+          old_options='<select id="printingKindFilter" aria-label="繁中版印刷版本"><option value="">全部繁中版印刷版本</option><option value="base">一般版</option><option value="parallel">平行／異圖</option><option value="reprint">復刻版</option><option value="special">特殊版</option><option value="manga">漫畫版（依來源標記）</option><option value="promo">宣傳版</option></select>'
+          new_options='<select id="printingKindFilter" aria-label="繁中版印刷版本"><option value="">全部卡牌</option><option value="base">一般版</option><option value="parallel">平行／異圖</option><option value="reprint">復刻版</option></select>'
+          assert html.count(old_options)==1, 'Current four-option selector baseline changed; abort.'
+          html=html.replace(old_options,new_options)
+          assert html.count('v=13.3')==4, 'Unexpected number of site asset versions'
+          html=html.replace('v=13.3','v=13.4')
+          assert html.count('v13.3 · 更新紀錄')==1
+          html=html.replace('v13.3 · 更新紀錄','v13.4 · 更新紀錄')
+          index.write_text(html,'utf-8')
+
+          history=versions.read_text('utf-8')
+          assert "{version:'13.3'" in history
+          assert history.count('  const RELEASES = [')==1
+          history=history.replace('  const RELEASES = [', '''  const RELEASES = [
+              {version:'13.4', date:'2026-11-23', status:'圖鑑呈現改版', title:'全部卡牌與三種卡面清單', changes:[
+                '全部卡牌：同卡號只顯示一次，優先使用繁中一般版卡面',
+                '一般版、平行／異圖、復刻版：每張符合的繁中卡面獨立列出，相同卡號可重複',
+                '版本下拉選單縮減為四項，保留既有組牌、賽事及個人牌組'
+              ]},''',1)
+          versions.write_text(history,'utf-8')
+
+          worker=sw.read_text('utf-8')
+          old_cache='grand-decks-shell-v13-3-zh-tw-editions-1'
+          assert worker.count(old_cache)==1, 'Unrecognized service-worker cache key'
+          worker=worker.replace(old_cache,'grand-decks-shell-v13-4-edition-views-1')
+          sw.write_text(worker,'utf-8')
+          print('Applied v13.4: all cards canonical, per-printing base/parallel/reprint views, four choices, versioned assets')
+          PY
+
+      - name: Run existing tests, new edition-mode tests and validate deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node --check public/app.js
+          node --check public/results.js
+          node --check public/version-history.js
+          node --check public/sw.js
+          python -m json.tool public/data/cards.json > /dev/null
+          python -m json.tool public/data/printings.json > /dev/null
+          python - <<'PY'
+          from pathlib import Path
+          import json,re
+          root=Path('public')
+          html=(root/'index.html').read_text('utf-8')
+          app=(root/'app.js').read_text('utf-8')
+          assert 'v13.4 · 更新紀錄' in html
+          match=re.search(r'<select id="printingKindFilter".*?</select>',html)
+          assert match, 'Edition filter missing'
+          options=re.findall(r'<option value="([^"]*)">([^<]*)</option>',match.group(0))
+          assert options == [('','全部卡牌'),('base','一般版'),('parallel','平行／異圖'),('reprint','復刻版')],options
+          assert 'function catalogueEditionRows()' in app
+          assert "if(page==='cards'){renderCards();" in app
+          assert 'function catalogueTileArt(card,edition,mode)' in app
+          assert (root/'results.js').exists()
+          data=json.loads((root/'data/printings.json').read_text('utf-8'))
+          items=data['byCard'].get('OP01-001',[])
+          tw=[v for v in items if v.get('locale')=='zh-TW' and v.get('image','').startswith('https://')]
+          kinds=[v['kind'] for v in tw]
+          assert kinds.count('base')>=1 and kinds.count('parallel')>=2,kinds
+          actual={'base':0,'parallel':0,'reprint':0}
+          for versions in data['byCard'].values():
+            for v in versions:
+              if v.get('locale')=='zh-TW' and v.get('image','').startswith('https://') and v.get('kind') in actual:
+                actual[v['kind']]+=1
+          assert actual['base']>2500 and actual['parallel']>1000 and actual['reprint']>100,actual
+          print('Card source coverage:',actual,'and OP01-001',len(tw),'zh-TW artworks')
+          PY
+          node - public/app.js <<'JS'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const app=fs.readFileSync(process.argv[2],'utf8');
+          const begin=app.indexOf('function cardMatches(c){');
+          const end=app.indexOf('// All card images across the PWA',begin);
+          assert(begin>=0&&end>begin);
+          const code=app.slice(begin,end);
+          const base='https://asia-tw.onepiece-cardgame.com/images/cardlist/card/';
+          const fixture=[
+           {cardId:'OP01-001',printId:'OP01-001',locale:'zh-TW',kind:'base',rarity:'Leader',image:base+'OP01-001.png'},
+           {cardId:'OP01-001',printId:'OP01-001_p1',locale:'zh-TW',kind:'parallel',rarity:'Leader',image:base+'OP01-001_p1.png'},
+           {cardId:'OP01-001',printId:'OP01-001_p2',locale:'zh-TW',kind:'parallel',rarity:'Leader',image:base+'OP01-001_p2.png'},
+           {cardId:'OP01-001',printId:'OP01-001_r1',locale:'zh-TW',kind:'reprint',rarity:'Leader',image:base+'OP01-001_r1.png'},
+           {cardId:'EB01-009',printId:'EB01-009',locale:'zh-TW',kind:'base',rarity:'SR',image:base+'EB01-009.png'},
+           {cardId:'EB01-009',printId:'EB01-009_r1',locale:'zh-TW',kind:'reprint',rarity:'SR',image:base+'EB01-009_r1.png'},
+           {cardId:'OP01-001',printId:'OP01-001_p999',locale:'en',kind:'parallel',rarity:'Leader',image:base+'OP01-001_p999.png'},
+          ];
+          const filterElements={
+           '#cardSearch':{value:''},'#colorFilter':{value:''},'#typeFilter':{value:''},'#setFilter':{value:''},
+           '#rarityFilter':{value:''},'#printingKindFilter':{value:''},
+           '#cardCount':{textContent:''},'#cardGrid':{innerHTML:''},'#moreCards':{hidden:false}
+          };
+          const records={ 'OP01-001':fixture.filter(x=>x.cardId==='OP01-001'&&x.locale==='zh-TW'), 'EB01-009':fixture.filter(x=>x.cardId==='EB01-009')};
+          const ctx={
+           cards:[{id:'OP01-001',name:'索隆',category:'Leader',pack_id:'OP01',colors:['Red'],rarity:'Leader'},{id:'EB01-009',name:'Test',category:'Character',pack_id:'EB01',colors:['Red'],rarity:'SR'},{id:'OP01-001',name:'Duplicate ID',category:'Leader',pack_id:'OP01',colors:['Red'],rarity:'Leader'}],
+           shownCards:72,twPrintingsByCard:records,$:name=>filterElements[name],displayCardText:v=>String(v),
+           rarityCode:s=>String(s||''),versionKind:s=>String(s),taiwanVersions:id=>records[id]||[],
+           safe:v=>String(v),cardColor:()=>'#ddd',art:c=>'<div class="cardart">'+String(c.image||c.id)+'</div>',
+           taiwanVersionKindLabel:s=>String(s),window:{},TW_CARD_IMAGE:/^https:\/\/asia-tw\.onepiece-cardgame\.com\/images\/cardlist\/card\/[a-z0-9_-]+\.png$/i
+          };
+          vm.createContext(ctx);vm.runInContext(code,ctx);
+          function report(kind){filterElements['#printingKindFilter'].value=kind;const r=vm.runInContext('catalogueEditionRows()',ctx);vm.runInContext('renderCards()',ctx);return {rows:r.map(x=>({id:x.card.id,printId:x.edition?.printId||null})),html:filterElements['#cardGrid'].innerHTML,count:filterElements['#cardCount'].textContent};}
+          let all=report('');assert.equal(all.rows.length,2);assert(all.rows.some(x=>x.id==='OP01-001'&&x.printId==='OP01-001'));assert.equal(new Set(all.rows.map(x=>x.id)).size,2);
+          let normal=report('base');assert.equal(normal.rows.length,2);assert(normal.html.includes('OP01-001.png'));
+          let parallel=report('parallel');assert.equal(parallel.rows.length,2);assert(parallel.html.includes('OP01-001_p1.png')&&parallel.html.includes('OP01-001_p2.png'));assert(parallel.rows.every(x=>x.id==='OP01-001'));
+          let reprint=report('reprint');assert.equal(reprint.rows.length,2);assert(reprint.html.includes('OP01-001_r1.png')&&reprint.html.includes('EB01-009_r1.png'));
+          filterElements['#rarityFilter'].value='SR';let sr=report('parallel');assert.equal(sr.rows.length,0);let srBase=report('base');assert.deepEqual(srBase.rows.map(x=>x.id),['EB01-009']);
+          console.log('PASS: 4 filter modes, duplicates by artwork, base preference, rarity, zh-TW isolation, proper grid image URL');
+          JS
+          git diff --check
+
+      - name: Commit verified website-only changes to original main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/index.html public/version-history.js public/sw.js
+          if git diff --cached --quiet; then
+            echo 'Already v13.4. No duplicate commit or workflow failure.'
+            exit 0
+          fi
+          git commit -m 'feat: GRAND DECKS v13.4 canonical and per-printing card views'
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo 'Original main updated to v13.4; verify the Cloudflare deployment.'
