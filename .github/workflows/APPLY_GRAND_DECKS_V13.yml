@@ -105,7 +105,7 @@ jobs:
           git add scripts/sync_full_catalogue.py scripts/test_full_catalogue.py \
             scripts/run_sync.py public/index.html public/app.js \
             public/style.css public/version-history.js public/sw.js \
-            .github/workflows/sync-results.yml public/data
+            public/data
           if git diff --cached --quiet; then
             echo 'No website changes to commit.'
             exit 0
