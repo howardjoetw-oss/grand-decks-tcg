@@ -1,0 +1,115 @@
+name: GRAND DECKS - Apply v13 upgrade (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+
+jobs:
+  upgrade-v13:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out the existing main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify the original site and supplied update package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f public/index.html
+          test -f public/app.js
+          test -f public/results.js
+          test -f public/data/cards.json
+          test -f GRAND_DECKS_V13_UPDATE_EXISTING.zip
+          echo '34e21fbe8f3ba04d58e0ad3a04895fedb1585cccb78ceedbd5f14dc29f8a6b81  GRAND_DECKS_V13_UPDATE_EXISTING.zip' | sha256sum -c -
+          if grep -q 'v13.0' public/index.html; then
+            echo 'v13 is already in the repository. Refusing to apply the patch a second time.'
+            exit 1
+          fi
+          grep -q 'v12.0' public/index.html
+          unzip -t GRAND_DECKS_V13_UPDATE_EXISTING.zip >/dev/null
+          mkdir -p "$RUNNER_TEMP/grand-decks-v13"
+          unzip -q GRAND_DECKS_V13_UPDATE_EXISTING.zip -d "$RUNNER_TEMP/grand-decks-v13"
+          test -f "$RUNNER_TEMP/grand-decks-v13/apply_v13.py"
+          test -f "$RUNNER_TEMP/grand-decks-v13/sync_full_catalogue.py"
+          echo 'v12 baseline and update package verified.'
+
+      - name: Apply v13 patch (existing project only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python "$RUNNER_TEMP/grand-decks-v13/apply_v13.py" "$GITHUB_WORKSPACE"
+
+      - name: Install free Python test dependency
+        run: python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+
+      - name: Run tests and check website scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node --check public/app.js
+          node --check public/results.js
+          node --check public/version-history.js
+          node --check public/sw.js
+
+      - name: Synchronize complete card catalogue and existing tournament data
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/run_sync.py
+
+      - name: Validate complete deployment data before changing main
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool public/data/cards.json >/dev/null
+          python -m json.tool public/data/printings.json >/dev/null
+          python -m json.tool public/data/decks.json >/dev/null
+          python -m json.tool public/data/meta.json >/dev/null
+          python -m json.tool public/data/integrity.json >/dev/null
+          python -m json.tool public/data/sync-status.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=Path('public/data')
+          cards=json.loads((data/'cards.json').read_text('utf-8'))
+          prints=json.loads((data/'printings.json').read_text('utf-8'))
+          assert len(cards.get('cards',[])) >= 2996, 'Card count would shrink below v12 baseline'
+          assert prints.get('printingCount',0) >= 100, 'Printings catalogue is empty or too small'
+          assert prints.get('byCard'), 'Missing per-card printing index'
+          assert Path('public/results.js').exists(), 'Existing tournament UI is missing'
+          print('Validated:',len(cards['cards']),'canonical cards;',prints['printingCount'],'regional printings')
+          PY
+
+      - name: Commit and push upgrade only after all checks succeed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/sync_full_catalogue.py scripts/test_full_catalogue.py \
+            scripts/run_sync.py public/index.html public/app.js \
+            public/style.css public/version-history.js public/sw.js \
+            .github/workflows/sync-results.yml public/data
+          if git diff --cached --quiet; then
+            echo 'No website changes to commit.'
+            exit 0
+          fi
+          git commit -m 'feat: GRAND DECKS v13 complete catalogue and card printings'
+          git push origin HEAD:main
+          echo 'v13 pushed to original main branch. Check Cloudflare deployment and live site.'
