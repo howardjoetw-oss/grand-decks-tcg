@@ -1,0 +1,262 @@
+name: GRAND DECKS - Fix v13.7 invisible card artworks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+
+jobs:
+  fix-v13-7:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout original main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply guarded fix (idempotent)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          P = Path('public')
+          app_path = P/'app.js'
+          html_path = P/'index.html'
+          css_path = P/'style.css'
+          sw_path = P/'sw.js'
+          history_path = P/'version-history.js'
+
+          files=(app_path,html_path,css_path,sw_path,history_path,P/'results.js',P/'data/printings.json')
+          for f in files:
+              if not f.exists():
+                  raise AssertionError('Required file missing: '+str(f))
+
+          def once(text,old,new,label):
+              count=text.count(old)
+              if count!=1:
+                  raise AssertionError(f'{label}: expected one exact anchor, found {count}; no changes committed')
+              return text.replace(old,new,1)
+
+          html=html_path.read_text('utf-8')
+          if 'v13.7 · 更新紀錄' in html:
+              print('Already v13.7. Nothing to apply.')
+              raise SystemExit(0)
+          if 'v13.6 · 更新紀錄' not in html:
+              raise AssertionError('Not a supported v13.6 baseline, aborting safely.')
+          app=app_path.read_text('utf-8')
+
+          # Keep all the four existing filtering modes and the modal image-preview experience.
+          start=app.index('function catalogueTileArt(card,edition,mode){')
+          end=app.index('function renderCards(){',start)
+          replacement=r'''// v13.7: candidates never change the card number or printing suffix.
+          // They are used only after the original Taiwanese image cannot load.
+          function printingEditionSources(edition){
+           const raw=String(edition?.image||'');
+           if(!TW_CARD_IMAGE.test(raw))return [];
+           let parsed;try{parsed=new URL(raw);}catch{return [];}
+           const path=parsed.pathname;
+           if(!/^\/images\/cardlist\/card\/[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/i.test(path))return [];
+           const clean=parsed.origin+path;
+           const urls=[raw,clean];
+           // Same filename and print ID on another official region; never use a base image for _p1/_r1.
+           for(const host of ['en.onepiece-cardgame.com','asia-en.onepiece-cardgame.com','www.onepiece-cardgame.com']){
+            urls.push('https://'+host+path);
+           }
+           return [...new Set(urls)];
+          }
+          function catalogueTileArt(card,edition,mode){
+           let sources=printingEditionSources(edition);
+           if(mode==='all'){
+            // Normal card can use known v13 fallbacks, always the same original card ID.
+            sources=[...new Set([...sources,...cardImageCandidates(card)])];
+           }
+           if(!sources.length)return '';
+           const label=String(edition?.printId||card.id);
+           return `<div class="cardart"><span class="artText">${safe(label)}</span><img src="${safe(sources[0])}" data-edition-sources="${safe(JSON.stringify(sources))}" data-edition-index="0" alt="${safe(card.name)} · ${safe(label)}" loading="lazy" decoding="async" onload="window.grandCatalogueEditionLoaded(this)" onerror="window.grandCatalogueEditionFailed(this)"></div>`;
+          }
+          function refreshVisibleArtworkCount(){
+           const grid=document.getElementById('cardGrid'),label=document.getElementById('cardCount');
+           if(!grid||!label)return;
+           const imgs=[...grid.querySelectorAll('img[data-edition-sources]')];
+           const loaded=imgs.filter(i=>i.complete&&i.naturalWidth>0).length;
+           const pending=imgs.filter(i=>!i.complete).length;
+           const source=Number(grid.dataset.sourceCount||0);
+           const mode=document.getElementById('printingKindFilter')?.value;
+           if(source){
+            label.textContent=pending
+             ? `已顯示 ${loaded} 張 · 圖片載入中（找到 ${source} 筆${mode?'版本':'卡牌'}紀錄）`
+             : `已顯示 ${loaded} 張有圖片的卡面（來源 ${source} 筆）`;
+           }else{label.textContent="0 款符合條件的卡面";}
+           const note=document.getElementById('editionImageNotice');
+           if(note){
+            const none=(source>0&&loaded===0&&pending===0);
+            note.hidden=!none;
+            if(none)note.textContent=`已找到 ${source} 筆版本紀錄，但圖片來源目前皆無法載入。請切換「全部卡牌」或稍後重新整理；這不是沒有卡牌資料。`;
+           }
+          }
+          window.grandCatalogueEditionLoaded=function(img){
+           if(!img?.isConnected)return;
+           img.closest('.cardtile')?.classList.add('artReady');
+           refreshVisibleArtworkCount();
+          };
+          window.grandCatalogueEditionFailed=function(img){
+           if(!img?.isConnected)return;
+           let sources=[];try{sources=JSON.parse(img.dataset.editionSources||'[]');}catch{}
+           const next=(Number(img.dataset.editionIndex||0)+1);
+           if(next<sources.length){
+            img.dataset.editionIndex=String(next);
+            img.src=sources[next];
+            return;
+           }
+           // Only after every image candidate failed: remove the empty tile, not all results.
+           img.closest('.cardtile')?.remove();
+           refreshVisibleArtworkCount();
+          };
+          '''
+          app = app[:start]+replacement+app[end:]
+
+          # Render all rows but keep truthful counts; don't report a URL count as actual images.
+          app=once(app,
+           " $('#cardCount').textContent=matched.length.toLocaleString('zh-TW')+(kind?' 款卡面':' 張卡牌');",
+           " $('#cardCount').textContent='圖片載入中…（找到 '+matched.length.toLocaleString('zh-TW')+' 筆來源）';",
+           'status count')
+          app=once(app,
+           " $('#cardGrid').innerHTML=matched.slice(0,shownCards).map(({card:c,edition:v})=>{",
+           " $('#cardGrid').dataset.sourceCount=String(matched.length);\n $('#cardGrid').innerHTML=matched.slice(0,shownCards).map(({card:c,edition:v})=>{",
+           'grid source count')
+          app=once(app,
+           " }).join('')||'<div class=\"note\">找不到符合條件的卡面。</div>';",
+           " }).join('')+(matched.length?'<div id=\"editionImageNotice\" class=\"note editionImageNotice\" hidden></div>':'<div class=\"note\">找不到符合條件的卡面。</div>');\n refreshVisibleArtworkCount();",
+           'display error status')
+
+          # Only same printing ID fallback, and preserve in-dialog preview behavior.
+          app=once(app,
+           "window.grandTaiwanImageFailed=function(img) {\n const panel=img?.closest('#cardPrintingsPanel');\n img?.closest('.printingCard')?.remove();\n updateTaiwanVersionCount(panel);\n};",
+           """window.grandTaiwanImageFailed=function(img) {
+           if(!img?.isConnected)return;
+           let sources=[];try{sources=JSON.parse(img.dataset.editionSources||'[]');}catch{}
+           const next=Number(img.dataset.editionIndex||0)+1;
+           if(next<sources.length){img.dataset.editionIndex=String(next);img.src=sources[next];return;}
+           const panel=img.closest('#cardPrintingsPanel');
+           img.closest('.printingCard')?.remove();
+           updateTaiwanVersionCount(panel);
+          };""",
+           'gallery image fallback')
+          app=once(app,
+           " if(!TW_CARD_IMAGE.test(url))return false;",
+           " if(!/^https:\\/\\/(?:asia-tw|asia-tc|en|asia-en|www)\\.onepiece-cardgame\\.com\\/images\\/cardlist\\/card\\/[a-z0-9_-]+\\.(?:png|jpe?g|webp)(?:\\?[^\\\"'<>]*)?$/i.test(url))return false;",
+           'preview allow fallback origins')
+          old_thumb='<img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandTaiwanImageFailed(this)">'
+          new_thumb='<img loading="lazy" decoding="async" src="${safe(url)}" data-edition-sources="${safe(JSON.stringify(printingEditionSources(v)))}" data-edition-index="0" alt="${safe(title)}" onerror="window.grandTaiwanImageFailed(this)">'
+          app=once(app,old_thumb,new_thumb,'thumbnail fallback')
+          app_path.write_text(app,'utf-8')
+
+          # Introduce a new cache key and versioned scripts to guarantee the corrected JS loads.
+          html=once(html,'v13.6 · 更新紀錄','v13.7 · 更新紀錄','version label')
+          for name in ('app.js','style.css','results.js','version-history.js'):
+              html=once(html,name+'?v=13.6',name+'?v=13.7','cache '+name)
+          html_path.write_text(html,'utf-8')
+
+          sw=sw_path.read_text('utf-8')
+          sw=once(sw,"grand-decks-shell-v13-6-preview-artwork-1","grand-decks-shell-v13-7-artwork-fallback-1",'service worker cache')
+          sw_path.write_text(sw,'utf-8')
+
+          history=history_path.read_text('utf-8')
+          anchor="  const RELEASES = ["
+          assert history.count(anchor)==1
+          history=once(history,anchor,anchor+"""
+              {version:'13.7', date:'2026-11-23', status:'卡圖載入修正', title:'修復篩選有結果卻沒有卡圖', changes:[
+                '平行異圖及復刻卡面失敗時依序檢查同一印刷版的其他官方來源；不拿一般版冒充異圖',
+                '無法載圖時顯示真正成功載入數量及明確提示，不再只留下空白區域',
+                '保留 v13.6 四種卡庫篩選和卡牌詳情就地預覽，不修改組牌與賽事資料'
+              ]},""",'release note')
+          history_path.write_text(history,'utf-8')
+
+          css=css_path.read_text('utf-8')
+          if '.editionImageNotice' not in css:
+              css+='\n/* v13.7: empty-image message remains visible when all origins fail. */\n.editionImageNotice{grid-column:1/-1;display:block;padding:18px;border:1px dashed var(--line);border-radius:10px;background:var(--panel)}\n.editionImageNotice[hidden]{display:none}\n'
+          css_path.write_text(css,'utf-8')
+          print('v13.7 patch applied to five site files; no card/deck datasets touched')
+          PY
+
+      - name: Run original regressions plus actual image-candidate checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node --check public/app.js
+          node --check public/results.js
+          node --check public/version-history.js
+          node --check public/sw.js
+          git diff --check
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('public')
+          html=(p/'index.html').read_text('utf-8')
+          app=(p/'app.js').read_text('utf-8')
+          assert 'v13.7 · 更新紀錄' in html
+          assert 'id="languageFilter"' not in html
+          assert 'id="printingKindFilter"' in html
+          assert 'function printingEditionSources(' in app
+          assert 'function refreshVisibleArtworkCount(' in app
+          assert "img.closest('.cardtile')?.remove();" in app
+          assert 'window.grandCatalogueEditionLoaded' in app
+          assert 'selectCardPrintingPreview' in app
+          assert 'cardDetailMainArt' in app
+          assert (p/'results.js').exists() and (p/'data/decks.json').exists()
+          data=json.loads((p/'data/printings.json').read_text('utf-8'))
+          samples=data['byCard']['OP01-001']
+          originals=[r for r in samples if r.get('locale')=='zh-TW' and r.get('image')]
+          assert len(originals)>=3, len(originals)
+          print('OP01-001 available zh-TW record URLs:',len(originals))
+          PY
+          node <<'JS'
+          'use strict';
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const code=fs.readFileSync('public/app.js','utf8');
+          const a=code.indexOf('function printingEditionSources(');
+          const b=code.indexOf('function catalogueTileArt(',a);
+          assert(a>0&&b>a);
+          const context={URL,TW_CARD_IMAGE:/^https:\/\/(?:asia-tw|asia-tc)\.onepiece-cardgame\.com\/images\/cardlist\/card\/[a-z0-9_-]+\.(?:png|jpe?g|webp)(?:\?[^"'<>]*)?$/i};
+          vm.runInNewContext(code.slice(a,b)+';this.candidates=printingEditionSources;',context);
+          const print='OP01-001_p1';
+          const urls=context.candidates({image:'https://asia-tw.onepiece-cardgame.com/images/cardlist/card/'+print+'.png?261016'});
+          assert(urls.length>=3,urls.length);
+          assert(urls.every(u=>u.includes('/'+print+'.png')),'All fallback image URLs must keep identical print suffix');
+          assert(urls.some(u=>u.includes('en.onepiece-cardgame.com')),'English host same printing fallback missing');
+          assert.equal(context.candidates({image:'https://unknown.example/malware.png'}).length,0);
+          assert(code.includes('window.grandCatalogueEditionFailed=function(img)')); 
+          console.log('Image candidate and print identity tests passed:',urls.join(' , '));
+          JS
+
+      - name: Publish only verified UI files (never change decks or printings data)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/index.html public/style.css public/sw.js public/version-history.js
+          if git diff --cached --quiet; then
+            echo 'Already up to date: no changes. Marking success.'
+            exit 0
+          fi
+          git commit -m 'fix: GRAND DECKS v13.7 artwork fallbacks and visible result counters'
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo 'Pushed v13.7 to main; connected Cloudflare Pages may deploy automatically.'
