@@ -1,0 +1,203 @@
+name: GRAND DECKS - Apply v13.9 Japanese-first artwork
+
+"on":
+  push:
+    paths:
+      - '.github/workflows/APPLY_GRAND_DECKS_V13_9_JP_FIRST.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+
+jobs:
+  japanese-first:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out existing main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply guarded Japanese-first patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PYCODE'
+          from pathlib import Path
+
+          P=Path('public')
+          app_path=P/'app.js'
+          html_path=P/'index.html'
+          sw_path=P/'sw.js'
+          hist_path=P/'version-history.js'
+          for f in (app_path,html_path,sw_path,hist_path,P/'data/printings.json',P/'results.js'):
+              if not f.exists():
+                  raise AssertionError('Missing required file: '+str(f))
+
+          def replace_one(text, old, new, label):
+              n=text.count(old)
+              if n!=1:
+                  raise AssertionError(f'{label}: expected one anchor, got {n}. Stopped before writing.')
+              return text.replace(old,new,1)
+
+          def replace_range(text, first, after, replace, label):
+              i=text.find(first)
+              j=text.find(after, i+len(first))
+              if i<0 or j<0 or text.find(first,i+1)>=0:
+                  raise AssertionError(f'{label}: baseline does not match v13.8; aborted.')
+              return text[:i]+replace+text[j:]
+
+          app=app_path.read_text('utf-8')
+          html=html_path.read_text('utf-8')
+          sw=sw_path.read_text('utf-8')
+          history=hist_path.read_text('utf-8')
+          if 'v13.9 · 更新紀錄' in html:
+              print('Already v13.9: no changes necessary')
+              raise SystemExit(0)
+          if 'v13.8 · 更新紀錄' not in html:
+              raise AssertionError('Expected v13.8 baseline. Will not overwrite a different version.')
+
+          # The actual card language is provided by the 'locale' of each artwork
+          # record.  Do not guess that identical artwork in another language is JP.
+          app=replace_one(app,
+              "const EDITION_LOCALE_RANK={'zh-TW':0,en:1,'en-asia':2,jp:3,tcgcsv:4,'zh-HK':5};",
+              "const EDITION_LOCALE_RANK={jp:0,'zh-TW':1,'zh-HK':2,en:3,'en-asia':4,cn:5,tcgcsv:6};",
+              'Japanese-first per-printing preference')
+
+          # Other screens (deck builder, tournament cards, card detail before the
+          # gallery loads) use a separate helper. Prefer an existing JP base URL
+          # from the exact card ID, then official Japanese cardlist fallback.
+          # This does not replace the user-selected image in the detail dialog.
+          new_base=r'''function cardImageCandidates(card){
+            if(!card||card.demo)return [];
+            const id=String(card.id||'').trim().toUpperCase();
+            if(!/^[A-Z0-9]{1,10}-\d{2,4}$/.test(id))return [];
+            const japaneseOfficial='https://www.onepiece-cardgame.com/images/cardlist/card/'+id+'.png';
+            const sources=twPrintingsByCard ? (allArtworkVersions(id).find(v=>v.kind==='base')?.sources||[]) : [];
+            const official=String(card.image||'').trim();
+            const hosts=[...sources,japaneseOfficial];
+            // Card metadata may contain a valid source URL that is not in printings.json.
+            // Keep it as fallback, not ahead of a known Japanese-language image.
+            if(isEditionImageURL(official))hosts.push(official);
+            hosts.push(
+              'https://asia-tc.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
+              'https://en.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
+              'https://asia-en.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
+              'https://optcg-api.arjunbansal-ai.workers.dev/images/'+encodeURIComponent(id)
+            );
+            return [...new Set(hosts)];
+          }
+          '''
+          app=replace_range(app, 'function cardImageCandidates(card){', 'window.grandImageFallback', new_base, 'canonical card art')
+
+          html=replace_one(html,'v13.8 · 更新紀錄','v13.9 · 更新紀錄','UI header')
+          for name in ('app.js','style.css','results.js','version-history.js'):
+              html=replace_one(html,name+'?v=13.8',name+'?v=13.9','cache '+name)
+          sw=replace_one(sw,'grand-decks-shell-v13-8-global-printing-1',
+              'grand-decks-shell-v13-9-japanese-first-1','PWA cache')
+
+          history=replace_one(history,'  const RELEASES = [','''  const RELEASES = [
+              {version:'13.9', date:'2026-11-23', status:'日文卡面優先', title:'有多個語言來源時優先顯示日文版', changes:[
+                '同卡號、同印刷版本有多種語言時，優先載入日文卡圖，失敗後再嘗試繁中、英文及其他來源',
+                '圖鑑、版本縮圖、組牌和賽事的卡圖預設日文優先，卡名與介面仍保留繁體中文',
+                '手動點選不同版本的卡圖，仍在原詳情視窗直接預覽，不會改變卡牌與牌組資料'
+              ]},''','version history')
+          for path,contents in ((app_path,app),(html_path,html),(sw_path,sw),(hist_path,history)):
+              path.write_text(contents,encoding='utf-8')
+          print('Prepared v13.9 Japanese-first update: only four UI files changed')
+          PYCODE
+      - name: Run repository regression tests and image ordering tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+          node --check public/app.js
+          node --check public/sw.js
+          node --check public/results.js
+          node --check public/version-history.js
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node <<'NODE'
+          'use strict';
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const app=fs.readFileSync('public/app.js','utf8');
+          const html=fs.readFileSync('public/index.html','utf8');
+          const history=fs.readFileSync('public/version-history.js','utf8');
+          assert(html.includes('v13.9 · 更新紀錄'));
+          for(const mode of ['全部卡牌','一般版','平行／異圖','復刻版'])assert(html.includes(mode));
+          assert(!html.includes('id="languageFilter"'));
+          assert(history.includes("version:'13.9'"));
+          assert(app.includes('function selectCardPrintingPreview(button)'));
+          assert(app.includes('hero.replaceChildren(next)'));
+          assert(app.includes("openCard(tile.dataset.card,tile.dataset.printId||'')"));
+          // Verify JP first for both normal and parallel printings; never confuse IDs.
+          const byCard={'OP01-001':[
+           {printId:'OP01-001',kind:'base',locale:'en',image:'https://en.onepiece-cardgame.com/images/cardlist/card/OP01-001.png'},
+           {printId:'OP01-001',kind:'base',locale:'zh-TW',image:'https://asia-tw.onepiece-cardgame.com/images/cardlist/card/OP01-001.png'},
+           {printId:'OP01-001',kind:'base',locale:'jp',image:'https://www.onepiece-cardgame.com/images/cardlist/card/OP01-001.png'},
+           {printId:'OP01-001_p1',kind:'parallel',locale:'en',image:'https://en.onepiece-cardgame.com/images/cardlist/card/OP01-001_p1.png'},
+           {printId:'OP01-001_p1',kind:'parallel',locale:'jp',image:'https://www.onepiece-cardgame.com/images/cardlist/card/OP01-001_p1.png'},
+           {printId:'OP01-001_r1',kind:'reprint',locale:'en',image:'https://en.onepiece-cardgame.com/images/cardlist/card/OP01-001_r1.png'}
+          ]};
+          const a=app.indexOf('const EDITION_OFFICIAL_HOSTS='),b=app.indexOf('function rarityCode(raw) {',a);
+          assert(a>=0&&b>a);
+          const ctx={URL,twPrintingsByCard:byCard,versionKind:s=>s};
+          vm.runInNewContext(app.slice(a,b)+';this.getVersions=allArtworkVersions;this.checkEditionImage=isEditionImageURL;',ctx);
+          const editions=ctx.getVersions('OP01-001');
+          assert.equal(editions.length,3,'one base, one parallel and one reprint');
+          const base=editions.find(v=>v.kind==='base');
+          const parallel=editions.find(v=>v.kind==='parallel');
+          assert(base.sources[0].includes('www.onepiece-cardgame.com'));
+          assert(parallel.sources[0].includes('www.onepiece-cardgame.com'));
+          assert(base.sources.some(u=>u.includes('asia-tw.onepiece-cardgame.com')));
+          assert(parallel.sources.every(u=>u.includes('OP01-001_p1.png')));
+          assert(editions.find(v=>v.kind==='reprint').sources[0].includes('/OP01-001_r1.png'));
+          // Mixed edition source images should also be Japanese-first in builder/tournament thumbnails.
+          const x=app.indexOf('function cardImageCandidates(card){'),y=app.indexOf('window.grandImageFallback',x);
+          assert(x>=0&&y>x);
+          const srcCtx={...ctx,allArtworkVersions:ctx.getVersions,isEditionImageURL:ctx.checkEditionImage,encodeURIComponent};
+          vm.runInNewContext(app.slice(x,y)+';this.getCardSources=cardImageCandidates;',srcCtx);
+          const sources=srcCtx.getCardSources({id:'OP01-001',name:'Zoro',image:'https://en.onepiece-cardgame.com/images/cardlist/card/OP01-001.png'});
+          assert(sources[0].includes('www.onepiece-cardgame.com'));
+          assert(sources.some(u=>u.includes('en.onepiece-cardgame.com')));
+          assert(sources.every(u=>!u.includes('OP01-001_p1')));
+          const raw=srcCtx.getCardSources({id:'OP16-001',image:'https://en.onepiece-cardgame.com/images/cardlist/card/OP16-001.png'});
+          assert(raw[0]==='https://www.onepiece-cardgame.com/images/cardlist/card/OP16-001.png');
+          assert(raw.includes('https://en.onepiece-cardgame.com/images/cardlist/card/OP16-001.png'));
+          console.log('PASS Japanese-first, fallback order, normal/parallel/reprint separation, selected preview preserved');
+          NODE
+          python - <<'PYTEST'
+          from pathlib import Path
+          app=Path('public/app.js').read_text('utf8')
+          html=Path('public/index.html').read_text('utf8')
+          assert 'v13.9 · 更新紀錄' in html
+          assert 'EDITION_LOCALE_RANK={jp:0' in app
+          assert "japaneseOfficial='https://www.onepiece-cardgame.com" in app
+          assert Path('public/data/decks.json').is_file()
+          assert Path('public/data/printings.json').is_file()
+          print('PASS original data files and four filter categories retained')
+          PYTEST
+          git diff --check
+      - name: Commit tested frontend files only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/index.html public/sw.js public/version-history.js
+          if git diff --cached --quiet; then
+            echo 'No changes: Japanese-first already applied.'
+            exit 0
+          fi
+          git commit -m 'feat: GRAND DECKS v13.9 Japanese-first artwork preference'
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo 'Pushed v13.9 to main. Cloudflare deployment still requires verification.'
