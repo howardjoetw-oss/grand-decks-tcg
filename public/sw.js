@@ -1,6 +1,8 @@
-/* v9: network-first for JSON, cache-first shell fallback. Never serve HTML to JSON requests. */
-const CACHE='grand-decks-shell-v13-9-japanese-first-1';
-const SHELL=['./','./index.html','./style.css','./app.js','./results.js','./version-history.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+/* GRAND DECKS v14.0 PWA: network-first, offline shell includes Deck Builder v14.
+ * Personal deck data remain in the browser's IndexedDB, not in this cache.
+ */
+const CACHE='grand-decks-shell-v14-0-deck-builder-1';
+const SHELL=['./','./index.html','./style.css','./app.js','./results.js','./deck-builder-v14.js','./version-history.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 const DATA=['./data/decks.json','./data/cards.json','./data/sync-status.json','./data/meta.json','./data/integrity.json','./data/rules.json','./data/topdecks-sets.json','./data/community.json'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('grand-decks-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
