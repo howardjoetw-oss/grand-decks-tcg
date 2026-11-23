@@ -1,0 +1,411 @@
+name: GRAND DECKS - Audit all series card artwork
+
+on:
+  push:
+    paths:
+      - '.github/workflows/GRAND_DECKS_ARTWORK_AUDIT.yml'
+  workflow_dispatch:
+    inputs:
+      max_urls:
+        description: 'Maximum URLs to verify in this run (read-only; 4000 recommended)'
+        required: false
+        default: '4000'
+
+permissions:
+  contents: read
+
+jobs:
+  artwork-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout original GRAND DECKS repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check all-series source data
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f public/data/printings.json
+          python - <<'PYDATA'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('public/data/printings.json').read_text('utf-8'))
+          assert isinstance(d.get('byCard'),dict)
+          series={k.split('-')[0] for k in d['byCard']}
+          assert len(series)>=40, f'Expected all-series library, got {len(series)} series'
+          print('Original catalogue:',len(d['byCard']),'cards and',len(series),'series.')
+          PYDATA
+      - name: Probe actual HTTPS image signatures and build diagnostic reports
+        shell: bash
+        env:
+          GD_WORKERS: '8'
+          GD_TIMEOUT: '7'
+          GD_DEADLINE: '1200'
+          GD_MAX_URLS: '${{ github.event.inputs.max_urls || ''4000'' }}'
+          GD_PRINTINGS: 'public/data/printings.json'
+          GD_AUDIT_OUT: 'artwork_audit_report'
+        run: |
+          set -euo pipefail
+          cat > /tmp/grand_decks_artwork_audit.py <<'PYCODE'
+          #!/usr/bin/env python3
+          """GRAND DECKS all-series image URL audit, read-only and free-stdlib.
+          Checks actual HTTP image response bytes; never modifies existing site data.
+          No image copying/rehosting. Outputs report/ and candidate verified manifest.
+          """
+          import csv
+          import json
+          import os
+          import socket
+          import sys
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from collections import Counter, defaultdict, deque
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          from datetime import datetime, timezone
+          from pathlib import Path
+          
+          SOURCE = Path(os.environ.get('GD_PRINTINGS', 'public/data/printings.json'))
+          OUT = Path(os.environ.get('GD_AUDIT_OUT', 'artwork_audit_report'))
+          MAX_WORKERS = min(12, max(1, int(os.environ.get('GD_WORKERS', '8'))))
+          DEADLINE_SECONDS = max(60, int(os.environ.get('GD_DEADLINE', '1200')))
+          TIMEOUT_SECONDS = min(14, max(3, int(os.environ.get('GD_TIMEOUT', '7'))))
+          MAX_URLS = max(1, int(os.environ.get('GD_MAX_URLS', '4000')))
+          UA = 'GrandDecksImageAudit/0.3 (read-only URL health check; no mirroring)'
+          ALLOWED_HOSTS = {
+              'asia-tw.onepiece-cardgame.com', 'asia-tc.onepiece-cardgame.com',
+              'en.onepiece-cardgame.com', 'asia-en.onepiece-cardgame.com',
+              'www.onepiece-cardgame.com', 'jp.onepiece-cardgame.com',
+              'onepiece-cardgame.com', 'tcgplayer-cdn.tcgplayer.com',
+          }
+          LANG_PREFERENCE = ['zh-TW', 'en', 'en-asia', 'jp', 'tcgcsv', 'zh-HK', 'cn']
+          KIND_PREFERENCE = {'base': 0, 'parallel': 1, 'reprint': 2}
+          
+          
+          def url_host(url):
+              try:
+                  p = urllib.parse.urlsplit(url)
+                  if p.scheme != 'https' or p.hostname not in ALLOWED_HOSTS or p.username or p.password:
+                      return ''
+                  return p.hostname
+              except (TypeError, ValueError):
+                  return ''
+          
+          
+          def signature(content):
+              if content.startswith(b'\x89PNG\r\n\x1a\n'):
+                  return 'png'
+              if content.startswith(b'\xff\xd8\xff'):
+                  return 'jpeg'
+              if content.startswith(b'RIFF') and content[8:12] == b'WEBP':
+                  return 'webp'
+              if content[:6] in (b'GIF87a', b'GIF89a'):
+                  return 'gif'
+              return ''
+          
+          
+          def check_url(url, deadline):
+              if not url_host(url):
+                  return {'status': 'invalid_url', 'code': 0}
+              if time.monotonic() >= deadline:
+                  return {'status': 'not_checked_timeout', 'code': 0}
+              request = urllib.request.Request(url, headers={
+                  'User-Agent': UA, 'Accept': 'image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8',
+                  'Range': 'bytes=0-63', 'Referer': '',
+              }, method='GET')
+              try:
+                  with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+                      code = response.status
+                      final_url = response.geturl()
+                      # Do not classify a redirect to an unknown host as a verified picture.
+                      if not url_host(final_url):
+                          return {'status': 'invalid_redirect', 'code': code}
+                      first = response.read(64)
+                      kind = signature(first)
+                      typ = response.headers.get('Content-Type', '').lower().split(';')[0]
+                      if kind and code in (200, 206):
+                          return {'status': 'verified', 'code': code, 'format': kind, 'content_type': typ}
+                      return {'status': 'not_image', 'code': code, 'content_type': typ}
+              except urllib.error.HTTPError as error:
+                  code = error.code
+                  if code in (404, 410):
+                      status = 'confirmed_missing'
+                  elif code in (401, 403, 407, 429):
+                      status = 'access_limited'
+                  elif 500 <= code <= 599 or code in (408, 425):
+                      status = 'temporary_http_error'
+                  elif code == 416:
+                      status = 'range_not_supported'
+                  else:
+                      status = 'other_http_error'
+                  return {'status': status, 'code': code}
+              except (OSError, urllib.error.URLError, socket.timeout, TimeoutError) as error:
+                  return {'status': 'network_error', 'code': 0, 'reason': str(error)[:95]}
+              except Exception as error:
+                  return {'status': 'unknown_error', 'code': 0, 'reason': str(error)[:95]}
+          
+          
+          def pick_host_probes(urls, entries, max_probes=5):
+              # Prefer different set families to avoid drawing conclusions from one series.
+              candidates = sorted(urls, key=lambda url: (
+                  0 if any(x.get('cardId', '').startswith('OP01-') for x in entries[url]) else
+                  1 if any(x.get('cardId', '').startswith('OP15-') for x in entries[url]) else
+                  2 if any(x.get('cardId', '').startswith('OP18-') for x in entries[url]) else
+                  3 if any(x.get('cardId', '').startswith('ST01-') for x in entries[url]) else 4,
+                  url))
+              distinct = set()
+              chosen = []
+              for url in candidates:
+                  sets = {e.get('cardId', '').split('-')[0] for e in entries[url]}
+                  fresh = bool(sets - distinct)
+                  if fresh or len(chosen) < 2:
+                      chosen.append(url)
+                      distinct |= sets
+                  if len(chosen) >= max_probes:
+                      break
+              return chosen
+          
+          
+          def canonical_key(row):
+              # Same physical printing ID across languages, but never confuse _p1 and _p2.
+              return (str(row.get('cardId', '')).upper(),
+                      str(row.get('printId', '')).lower(),
+                      str(row.get('kind', '')).lower())
+          
+          
+          def assemble(data):
+              # Reports include no inferred image variants, only URLs actually in input.
+              all_entries = defaultdict(list)
+              records = []
+              for cid, rows in sorted(data.get('byCard', {}).items()):
+                  for row in rows if isinstance(rows, list) else []:
+                      if not isinstance(row, dict):
+                          continue
+                      v = {k: row.get(k, '') for k in ('cardId', 'printId', 'locale', 'kind', 'image', 'source')}
+                      v['cardId'] = cid
+                      v['series'] = cid.split('-')[0]
+                      url = str(v['image'] or '')
+                      if url:
+                          all_entries[url].append(v)
+                      records.append(v)
+              return all_entries, records
+          
+          
+          def run():
+              OUT.mkdir(parents=True, exist_ok=True)
+              data = json.loads(SOURCE.read_text(encoding='utf-8'))
+              all_entries, records = assemble(data)
+              hosts = defaultdict(list)
+              invalid_urls = []
+              for url in all_entries:
+                  host = url_host(url)
+                  if host:
+                      hosts[host].append(url)
+                  else:
+                      invalid_urls.append(url)
+              result = {url: {'status': 'invalid_url', 'code': 0} for url in invalid_urls}
+              deadline = time.monotonic() + DEADLINE_SECONDS
+              print('Records:', len(records), 'unique URLs:', len(all_entries), 'series:',
+                    len({x['series'] for x in records}), flush=True)
+              # Do a small, bounded connectivity test for each source domain first.
+              for host, urls in sorted(hosts.items()):
+                  probes = pick_host_probes(urls, all_entries)
+                  for url in probes:
+                      result[url] = check_url(url, deadline)
+                  statuses = [result[url]['status'] for url in probes]
+                  print('Host probe', host, Counter(statuses), flush=True)
+                  if not any(s in ('verified', 'confirmed_missing', 'not_image') for s in statuses) and all(
+                          s in ('network_error', 'access_limited', 'temporary_http_error', 'range_not_supported',
+                                'not_checked_timeout', 'unknown_error') for s in statuses):
+                      for url in urls:
+                          result.setdefault(url, {'status': 'host_unverifiable', 'code': 0})
+                      print('Host skipped as unverifiable, not declared broken:', host, flush=True)
+          
+              # Round-robin series AND printing-kind coverage before going deep into one set.
+              # Prefer Traditional Chinese URLs; retain all other regions as further candidates.
+              buckets = defaultdict(list)
+              for url, attached in all_entries.items():
+                  if url in result:
+                      continue
+                  row = attached[0]
+                  buckets[(row['series'], row.get('kind', 'other'))].append(url)
+              def candidate_rank(url):
+                  locale = str(all_entries[url][0].get('locale', ''))
+                  return ((LANG_PREFERENCE.index(locale) if locale in LANG_PREFERENCE else 99), url)
+              queues = {k: deque(sorted(urls, key=candidate_rank)) for k, urls in buckets.items()}
+              ordered = sorted(queues, key=lambda k: (k[0], KIND_PREFERENCE.get(k[1], 9)))
+              todo = []
+              while len(todo) < MAX_URLS:
+                  more = False
+                  for key in ordered:
+                      if queues[key]:
+                          todo.append(queues[key].popleft())
+                          more = True
+                          if len(todo) >= MAX_URLS:
+                              break
+                  if not more:
+                      break
+              print('Full checks scheduled with per-series/per-kind coverage:', len(todo),
+                    'limit', MAX_URLS, flush=True)
+              # Stream at most a few bytes and close; do NOT mirror artwork.
+              with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+                  futures = {pool.submit(check_url, url, deadline): url for url in todo}
+                  for i, f in enumerate(as_completed(futures), start=1):
+                      url = futures[f]
+                      result[url] = f.result()
+                      if i % 1000 == 0:
+                          print('Checked:', i, 'of', len(todo), 'statuses:',
+                                Counter(v['status'] for v in result.values()), flush=True)
+          
+              for url in all_entries:
+                  result.setdefault(url, {'status': 'not_checked_limit', 'code': 0})
+              # Small diagnostic cross-host probes, without inventing additional cards.
+              # This helps distinguish 'bad source host' from 'this artwork filename absent'.
+              known_probe_ids = ('OP01-001', 'OP15-001', 'OP18-001', 'ST01-001')
+              by_card = data.get('byCard', {})
+              alternate_hosts = (
+                  'asia-tw.onepiece-cardgame.com', 'asia-tc.onepiece-cardgame.com',
+                  'en.onepiece-cardgame.com', 'asia-en.onepiece-cardgame.com',
+                  'www.onepiece-cardgame.com',
+              )
+              alias_checks = []
+              for card_id in known_probe_ids:
+                  candidates = [r for r in by_card.get(card_id, [])
+                                if isinstance(r, dict) and r.get('image') and r.get('locale') == 'zh-TW'
+                                and str(r.get('printId', '')).lower().endswith(('_p1', '-001'))]
+                  if not candidates:
+                      continue
+                  # One normal and one parallel if present.
+                  selected = []
+                  for kind in ('base', 'parallel'):
+                      match = next((r for r in candidates if r.get('kind') == kind), None)
+                      if match:
+                          selected.append(match)
+                  for row in selected:
+                      parsed = urllib.parse.urlsplit(row['image'])
+                      for host in alternate_hosts:
+                          # Original card filename on alternate verified official hosts.
+                          probe_url = urllib.parse.urlunsplit(('https', host, parsed.path, '', ''))
+                          if probe_url in result:
+                              status = result[probe_url]
+                          else:
+                              status = check_url(probe_url, deadline)
+                          alias_checks.append({
+                              'cardId': card_id, 'printId': row['printId'], 'kind': row['kind'],
+                              'host': host, 'probeUrl': probe_url,
+                              'status': status['status'], 'code': status.get('code', 0)
+                          })
+              with (OUT/'same_print_filename_probes.csv').open('w', encoding='utf-8-sig', newline='') as f:
+                  writer = csv.DictWriter(f, fieldnames=['cardId','printId','kind','host','probeUrl','status','code'])
+                  writer.writeheader()
+                  writer.writerows(alias_checks)
+              print('Cross-host filename probes:', len(alias_checks), flush=True)
+              stamp = datetime.now(timezone.utc).isoformat(timespec='seconds')
+              enriched = []
+              stats = defaultdict(lambda: Counter())
+              for row in records:
+                  url = str(row.get('image') or '')
+                  state = (result.get(url) or {'status': 'no_url'}) if url else {'status': 'no_url'}
+                  out = {**row, 'httpStatus': state['status'], 'httpCode': state.get('code', 0)}
+                  enriched.append(out)
+                  stats[row['series']][state['status']] += 1
+                  stats[row['series']]['total'] += 1
+                  if row['kind'] == 'base':
+                      stats[row['series']]['base_total'] += 1
+                      if state['status'] == 'verified':
+                          stats[row['series']]['base_verified'] += 1
+                  if row['kind'] == 'parallel':
+                      stats[row['series']]['parallel_total'] += 1
+                      if state['status'] == 'verified':
+                          stats[row['series']]['parallel_verified'] += 1
+                  if row['kind'] == 'reprint':
+                      stats[row['series']]['reprint_total'] += 1
+                      if state['status'] == 'verified':
+                          stats[row['series']]['reprint_verified'] += 1
+              with (OUT/'all_printings.csv').open('w', encoding='utf-8-sig', newline='') as f:
+                  fieldnames = ['series', 'cardId', 'printId', 'locale', 'kind', 'image', 'source', 'httpStatus', 'httpCode']
+                  writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
+                  writer.writeheader()
+                  writer.writerows(enriched)
+              fields = ['series', 'total', 'verified', 'base_total', 'base_verified', 'parallel_total',
+                        'parallel_verified', 'reprint_total', 'reprint_verified', 'confirmed_missing',
+                        'access_limited', 'host_unverifiable', 'network_error', 'no_url',
+                        'not_checked_timeout', 'not_checked_limit', 'not_image', 'temporary_http_error']
+              summary = [{**{'series': k}, **{f: int(v[f]) for f in fields if f != 'series'}} for k, v in sorted(stats.items())]
+              with (OUT/'series_summary.csv').open('w', encoding='utf-8-sig', newline='') as f:
+                  writer = csv.DictWriter(f, fieldnames=fields)
+                  writer.writeheader()
+                  writer.writerows(summary)
+              # Proposed manifest has only byte-verified URLs. It is NOT live website data.
+              grouped = defaultdict(list)
+              for row in enriched:
+                  if row['httpStatus'] == 'verified':
+                      grouped[canonical_key(row)].append(row)
+              verified = {}
+              for (card_id, print_id, kind), variants in grouped.items():
+                  variants.sort(key=lambda v: (LANG_PREFERENCE.index(v['locale']) if v['locale'] in LANG_PREFERENCE else 99, v['image']))
+                  verified.setdefault(card_id, []).append({
+                      'printId': variants[0]['printId'], 'kind': kind,
+                      'verifiedImages': [{'locale': v['locale'], 'url': v['image'], 'source': v['source']} for v in variants]
+                  })
+              for rows in verified.values():
+                  rows.sort(key=lambda v: (KIND_PREFERENCE.get(v['kind'], 99), v['printId']))
+              overall = Counter(v['httpStatus'] for v in enriched)
+              published = {'createdAt': stamp, 'status': 'diagnostic_only', 'input': str(SOURCE),
+                           'seriesCount': len(stats), 'cardIds': len(data.get('byCard', {})),
+                           'recordCount': len(records), 'imageUrlRecords': sum(bool(v['image']) for v in records),
+                           'uniqueUrls': len(all_entries), 'summary': dict(overall),
+                           'limitations': ['GitHub Actions can reach images that browsers may fail to embed',
+                                           'Access denied/rate limited/network failures are NOT proof of missing artwork',
+                                           'No artwork files were copied or republished'],
+                           'series': summary}
+              (OUT/'audit_summary.json').write_text(json.dumps(published, ensure_ascii=False, indent=2), encoding='utf-8')
+              (OUT/'proposed_verified_manifest.json').write_text(json.dumps({
+                  'diagnosticOnly': True, 'generatedAt': stamp, 'byCard': verified
+              }, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+              (OUT/'README.txt').write_text(
+                  'GRAND DECKS all-series image audit (read-only)\n'
+                  'verified = HTTP GET succeeded and image signature matched PNG/JPEG/WebP/GIF.\n'
+                  'confirmed_missing = server returned HTTP 404/410.\n'
+                  'access_limited/host_unverifiable/network_error = inconclusive; NEVER remove cards on this basis.\n'
+                  'not_image = returned content was not recognized as an image.\n'
+                  'proposed_verified_manifest.json is diagnostic only. Do not auto-deploy it.\n'
+                  'No artwork was downloaded into reports; only links and status.\n', encoding='utf-8')
+              print('DONE', json.dumps({k: published[k] for k in ('seriesCount', 'cardIds', 'recordCount', 'imageUrlRecords', 'uniqueUrls', 'summary')}, ensure_ascii=False), flush=True)
+          
+          
+          if __name__ == '__main__':
+              run()
+          PYCODE
+          python /tmp/grand_decks_artwork_audit.py
+      - name: Report coverage of every series in job logs
+        if: always()
+        shell: bash
+        run: |
+          if test -f artwork_audit_report/audit_summary.json; then
+            python - <<'PYREPORT'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('artwork_audit_report/audit_summary.json').read_text('utf-8'))
+          print('AUDIT SUMMARY:')
+          for k in ['seriesCount','cardIds','recordCount','imageUrlRecords','uniqueUrls']:
+              print(k,':',d[k])
+          print('HTTP byte-check results:',d['summary'])
+          print('SERIES SUMMARY (verified/total; parallels verified/total):')
+          for s in d['series']:
+              print(f"{s['series']}: {s['verified']}/{s['total']} verified, parallel {s['parallel_verified']}/{s['parallel_total']}, 404={s['confirmed_missing']}, blocked={s['access_limited']+s['host_unverifiable']}")
+          PYREPORT
+          else
+            echo 'Audit did not create output; check steps above.'
+          fi
+      - name: Upload read-only diagnostic report (no website deployment)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grand-decks-all-series-artwork-audit
+          path: artwork_audit_report/
+          if-no-files-found: warn
+          retention-days: 3
