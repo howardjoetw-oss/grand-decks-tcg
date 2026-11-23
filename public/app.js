@@ -13,7 +13,7 @@ let twPrintingsByCard = null;
 // v13.8: group public card images by SAME physical printing, not by locale.
 const EDITION_OFFICIAL_HOSTS=new Set(['asia-tw.onepiece-cardgame.com','asia-tc.onepiece-cardgame.com','en.onepiece-cardgame.com','asia-en.onepiece-cardgame.com','www.onepiece-cardgame.com']);
 const EDITION_MARKET_HOST='tcgplayer-cdn.tcgplayer.com';
-const EDITION_LOCALE_RANK={'zh-TW':0,en:1,'en-asia':2,jp:3,tcgcsv:4,'zh-HK':5};
+const EDITION_LOCALE_RANK={jp:0,'zh-TW':1,'zh-HK':2,en:3,'en-asia':4,cn:5,tcgcsv:6};
 let artworkVersionCache=new Map();
 function isEditionImageURL(value){
  const raw=String(value||'').trim();
@@ -197,17 +197,19 @@ function cardImageCandidates(card){
   if(!card||card.demo)return [];
   const id=String(card.id||'').trim().toUpperCase();
   if(!/^[A-Z0-9]{1,10}-\d{2,4}$/.test(id))return [];
-  const hosts=[
+  const japaneseOfficial='https://www.onepiece-cardgame.com/images/cardlist/card/'+id+'.png';
+  const sources=twPrintingsByCard ? (allArtworkVersions(id).find(v=>v.kind==='base')?.sources||[]) : [];
+  const official=String(card.image||'').trim();
+  const hosts=[...sources,japaneseOfficial];
+  // Card metadata may contain a valid source URL that is not in printings.json.
+  // Keep it as fallback, not ahead of a known Japanese-language image.
+  if(isEditionImageURL(official))hosts.push(official);
+  hosts.push(
     'https://asia-tc.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
     'https://en.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
-    'https://jp.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
+    'https://asia-en.onepiece-cardgame.com/images/cardlist/card/'+id+'.png',
     'https://optcg-api.arjunbansal-ai.workers.dev/images/'+encodeURIComponent(id)
-  ];
-  const official=String(card.image||'').trim();
-  if(/^https:\/\/(?:asia-tw|asia-tc|en|jp)\.onepiece-cardgame\.com\/images\/cardlist\/card\/[a-z0-9_-]+\.png(?:\?[^#]*)?$/i.test(official)){
-    // Source image first; every domain is tried at most once per rendered image.
-    hosts.unshift(official);
-  }
+  );
   return [...new Set(hosts)];
 }
 window.grandImageFallback=function(img){
