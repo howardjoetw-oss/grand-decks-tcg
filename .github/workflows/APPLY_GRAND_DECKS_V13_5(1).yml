@@ -1,0 +1,445 @@
+name: GRAND DECKS - Apply v13.5 all-language card artwork
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+
+jobs:
+  upgrade-v13-5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout original v13.4 project
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply safe v13.5 update to original project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          #!/usr/bin/env python3
+          """Safe, repeatable v13.4 -> v13.5 static website patch.
+          
+          Uses existing source-linked printings data. Does not download/copy copyrighted art,
+          change any private cards/decks, publish credentials, or enable paid services.
+          """
+          from pathlib import Path
+          import sys
+          
+          root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
+          files = [root / 'public' / n for n in ('app.js','index.html','style.css','sw.js','version-history.js','results.js','data/printings.json')]
+          for p in files:
+              assert p.is_file(), f'Missing original GRAND DECKS file: {p}'
+          app, html, css, sw, history = files[:5]
+          index = html.read_text('utf-8')
+          if 'v13.5 · 更新紀錄' in index:
+              print('Already upgraded to v13.5; existing website unchanged (safe repeat).')
+              sys.exit(0)
+          assert index.count('v13.4 · 更新紀錄') == 1, 'Expected exact v13.4 baseline; stop without changing files.'
+          
+          s = app.read_text('utf-8')
+          assert s.count('let twPrintingsByCard = null;') == 1
+          assert s.count('const DEMO_PEOPLE=') == 1
+          assert s.count('function catalogueEditionRows(){') == 1
+          assert s.count('// All card images across the PWA') == 1
+          assert s.count("if(page==='cards'){renderCards();if(!twPrintingsByCard)") == 1
+          assert s.count("['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter'].forEach(") == 1
+          
+          # Pure helpers enable unit testing without a DOM or network. Never load a substitute
+          # image with a different card number or a different printing ID.
+          new_front = r'''const PRINTINGS_URL = './data/printings.json';
+          let printingsRequest = null;
+          let globalPrintingsByCard = null;
+          const EDITION_LOCALES = ['zh-TW','jp','en','en-asia','zh-HK','cn','tcgcsv'];
+          const GLOBAL_IMAGE_URL = /^https:\/\/(?:(?:(?:asia-tw|asia-tc|en|asia-en|jp|www)\.onepiece-cardgame\.com|onepiece-cardgame\.com)\/images\/cardlist\/card\/[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)|tcgplayer-cdn\.tcgplayer\.com\/product\/[A-Za-z0-9_./-]+\.(?:png|jpe?g|webp))(?:\?[^"'<>]*)?$/i;
+          function supportedPrintingImage(value){return GLOBAL_IMAGE_URL.test(String(value||''));}
+          function editionLocale(value){
+           const k=String(value||'').trim().toLowerCase();
+           return ({'zh-tw':'zh-TW','jp':'jp','ja':'jp','ja-jp':'jp','en':'en','en-asia':'en-asia','zh-hk':'zh-HK','cn':'cn','zh-cn':'cn','tcgcsv':'tcgcsv'})[k]||k;
+          }
+          function editionLocaleLabel(locale){
+           return ({'zh-TW':'繁中（台灣）','jp':'日文','en':'英文','en-asia':'亞洲英文','zh-HK':'繁中（香港）','cn':'簡中','tcgcsv':'其他圖源'})[locale]||locale;
+          }
+          function rarityCode(raw) {
+           const value=String(raw||'').trim();
+           const codes={leader:'L',common:'C',uncommon:'UC',rare:'R',superrare:'SR',secretrare:'SEC',special:'SP',promo:'P',treasurerare:'TR',don:'DON!!'};
+           return codes[value.replace(/[\s_-]/g,'').toLowerCase()]||value.toUpperCase()||'—';
+          }
+          function versionKind(raw) {
+           const kind=String(raw||'').toLowerCase();
+           return ({normal:'base',original:'base',alternate:'parallel',altart:'parallel',alt:'parallel',specialart:'special'})[kind]||kind||'unknown';
+          }
+          function editionKindLabel(raw){
+           return ({base:'一般版',parallel:'平行／異圖',reprint:'復刻版',special:'特殊版',manga:'漫畫版',promo:'宣傳版',unknown:'其他'})[versionKind(raw)]||'其他';
+          }
+          function globalVersions(cardId,selectedLocale='') {
+           const locale=editionLocale(selectedLocale);
+           const rows=globalPrintingsByCard?.[cardId]||[];
+           const unique=new Map();
+           for(const entry of rows){
+            if(!entry || !supportedPrintingImage(entry.image))continue;
+            if(locale && editionLocale(entry.locale)!==locale)continue;
+            // Same URL (ignoring cache-bust query) is the same displayed asset; different
+            // languages/artworks or reprints must not be merged just because IDs match.
+            const key=String(entry.image).split('?')[0].toLowerCase();
+            if(!unique.has(key))unique.set(key,entry);
+           }
+           return [...unique.values()].sort((a,b)=>{
+            const la=EDITION_LOCALES.indexOf(editionLocale(a.locale));
+            const lb=EDITION_LOCALES.indexOf(editionLocale(b.locale));
+            const al=la<0?99:la,bl=lb<0?99:lb;
+            const order={base:0,parallel:1,reprint:2};
+            return al-bl || (order[versionKind(a.kind)]??4)-(order[versionKind(b.kind)]??4) || String(a.printId||'').localeCompare(String(b.printId||''),'en',{numeric:true});
+           });
+          }
+          function printingImageCandidates(entry){
+           const url=String(entry?.image||'');
+           if(!supportedPrintingImage(url))return [];
+           const out=[url];
+           // Only two alternate *official* hostname aliases for the identical edition URL.
+           // No unrelated artwork or silently relabelled translations.
+           const aliases={
+            'asia-tw.onepiece-cardgame.com':'asia-tc.onepiece-cardgame.com',
+            'asia-tc.onepiece-cardgame.com':'asia-tw.onepiece-cardgame.com',
+            'www.onepiece-cardgame.com':'jp.onepiece-cardgame.com',
+            'jp.onepiece-cardgame.com':'www.onepiece-cardgame.com'
+           };
+           try{
+            const parsed=new URL(url), next=aliases[parsed.hostname];
+            if(next){parsed.hostname=next;if(supportedPrintingImage(parsed.href))out.push(parsed.href);}
+           }catch{}
+           return [...new Set(out)];
+          }
+          async function fetchPrintingsOnce(){
+           if(!printingsRequest){
+            printingsRequest=fetchJson(PRINTINGS_URL+'?v='+Date.now()).then(data=>{
+             if(!data?.byCard||typeof data.byCard!=='object')throw Error('跨語言卡面索引格式無效');
+             globalPrintingsByCard=data.byCard;
+             return data;
+            }).catch(err=>{printingsRequest=null;throw err;});
+           }
+           return printingsRequest;
+          }
+          function updateGlobalPrintingCount(panel){
+           if(!panel)return;
+           const remaining=panel.querySelectorAll('.printingCard').length;
+           const tally=panel.querySelector('[data-global-shown]');if(tally)tally.textContent=String(remaining);
+           const total=Number(panel.dataset.globalSourceCount||0);
+           const note=panel.querySelector('.globalPrintingStatus');
+           if(note)note.textContent=total>remaining
+            ? `已篩選 ${total} 款有圖片網址的紀錄，其中 ${total-remaining} 款圖片目前載入失敗，未佔用卡片版面。`
+            : '僅收錄有圖片網址的紀錄；圖片由原來源網站提供。';
+          }
+          function tryNextPrintingImage(img,removeClass){
+           if(!img||!img.isConnected)return;
+           let sources=[];try{sources=JSON.parse(img.dataset.editionSources||'[]');}catch{}
+           const next=(Number(img.dataset.editionIndex)||0)+1;
+           if(next<sources.length){
+            img.dataset.editionIndex=String(next);
+            img.src=sources[next];
+            const anchor=img.closest('a');if(anchor)anchor.href=sources[next];
+            return;
+           }
+           const panel=img.closest('#cardPrintingsPanel');
+           img.closest(removeClass)?.remove();
+           if(panel)updateGlobalPrintingCount(panel);
+          }
+          window.grandEditionTileError=img=>tryNextPrintingImage(img,'.cardtile');
+          window.grandEditionDetailError=img=>tryNextPrintingImage(img,'.printingCard');
+          function renderGlobalPrintingGallery(cardId,lang=''){
+           const panel=document.getElementById('cardPrintingsPanel');
+           if(!panel||panel.dataset.cardId!==cardId)return;
+           const rows=globalVersions(cardId,lang);
+           panel.dataset.globalSourceCount=String(rows.length);
+           const gallery=panel.querySelector('.printingsGrid');
+           if(!gallery)return;
+           gallery.innerHTML=rows.map(v=>{
+            const sources=printingImageCandidates(v),url=sources[0];if(!url)return '';
+            const pid=String(v.printId||cardId),locale=editionLocale(v.locale);
+            const label=pid+' · '+editionLocaleLabel(locale);
+            return `<div class="printingCard"><a href="${safe(url)}" target="_blank" rel="noopener noreferrer" aria-label="開啟 ${safe(label)} 原圖"><img src="${safe(url)}" data-edition-sources="${safe(JSON.stringify(sources))}" data-edition-index="0" loading="lazy" decoding="async" alt="${safe(label)}" onerror="window.grandEditionDetailError(this)"></a><strong>${safe(pid)}</strong><small><span class="twRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(editionKindLabel(v.kind))}</small><small class="editionLanguage">${safe(editionLocaleLabel(locale))} · ${safe(locale)}</small></div>`;
+           }).join('');
+           updateGlobalPrintingCount(panel);
+          }
+          async function showCardPrintings(cardId){
+           const panel=document.getElementById('cardPrintingsPanel');
+           if(!panel||panel.dataset.cardId!==cardId)return;
+           try{
+            await fetchPrintingsOnce();
+            const current=document.getElementById('cardPrintingsPanel');
+            if(!current||current.dataset.cardId!==cardId||!$('#cardDialog').open)return;
+            const all=globalVersions(cardId);
+            current.innerHTML=`<h3>卡面與印刷版本（全部語言） · 來源 <span>${all.length}</span> 款</h3>`+
+             '<p class="tiny">所有語言的不同卡面集中顯示。同一卡號、不同語言／異圖不增加組牌可用張數。</p>'+
+             '<label class="editionLanguageSelect">圖片語言 <select id="detailLocaleFilter"><option value="">全部語言</option>'+EDITION_LOCALES.map(l=>`<option value="${safe(l)}">${safe(editionLocaleLabel(l))}</option>`).join('')+'</select></label>'+
+             '<p class="tiny globalPrintingStatus" aria-live="polite"></p><div class="printingsGrid"></div>'+
+             '<p class="tiny">版本索引：<a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records</a>、<a href="https://github.com/hotavocado/koala-kollect-data" target="_blank" rel="noopener noreferrer">Koala Kollect（CC BY 4.0）</a>。美術權利歸原權利人；無法存取的外部圖片不會冒充已驗證成功。</p>';
+            current.querySelector('#detailLocaleFilter')?.addEventListener('change',event=>renderGlobalPrintingGallery(cardId,event.target.value));
+            renderGlobalPrintingGallery(cardId);
+           }catch(err){
+            const current=document.getElementById('cardPrintingsPanel');
+            if(current&&current.dataset.cardId===cardId)current.textContent='跨語言版本資料目前無法取得；既有卡牌、組牌與賽事資料不受影響。';
+           }
+          }
+          
+          '''
+          start = s.index('const PRINTINGS_URL =')
+          end = s.index('const DEMO_PEOPLE=', start)
+          s = s[:start] + new_front + s[end:]
+          
+          new_catalogue = r'''function catalogueEditionRows(){
+           const kind=$('#printingKindFilter').value;
+           const rarity=$('#rarityFilter').value;
+           const locale=$('#languageFilter').value;
+           const rows=[],seenIds=new Set();
+           for(const c of cards){
+            if(!c?.id||seenIds.has(c.id)||!cardMatches(c))continue;
+            seenIds.add(c.id);
+            const entries=globalVersions(c.id,locale);
+            if(!kind){
+             // One canonical card ID per result; show base in preferred language first.
+             if(locale&&!entries.length)continue;
+             const base=entries.find(v=>versionKind(v.kind)==='base')||entries[0]||null;
+             if(rarity&&rarityCode(base?.rarity||c.rarity)!==rarity)continue;
+             rows.push({card:c,edition:base});
+            }else{
+             // Each unique image link is an independent printing result, regardless of ID.
+             for(const v of entries){
+              if(versionKind(v.kind)!==kind)continue;
+              if(rarity&&rarityCode(v.rarity||c.rarity)!==rarity)continue;
+              rows.push({card:c,edition:v});
+             }
+            }
+           }
+           return rows;
+          }
+          function catalogueTileArt(card,edition,mode){
+           let sources=edition?printingImageCandidates(edition):[];
+           if(mode==='all'&&!sources.length)sources=cardImageCandidates(card);
+           if(!sources.length)return '';
+           const id=String(edition?.printId||card.id);
+           return `<div class="cardart"><span class="artText">${safe(id)}</span><img src="${safe(sources[0])}" data-edition-sources="${safe(JSON.stringify(sources))}" data-edition-index="0" alt="${safe(card.name)} · ${safe(id)}" loading="lazy" decoding="async" onerror="window.grandEditionTileError(this)"></div>`;
+          }
+          function renderCards(){
+           const kind=$('#printingKindFilter').value;
+           const locale=$('#languageFilter').value;
+           if((kind||locale)&&!globalPrintingsByCard){
+            $('#cardCount').textContent='跨語言卡面索引載入中…';
+            $('#cardGrid').innerHTML='<p class="note">正在讀取所有語言的印刷版本資料…</p>';
+            $('#moreCards').hidden=true;
+            return;
+           }
+           const matched=catalogueEditionRows();
+           const mode=kind||'all';
+           $('#cardCount').textContent=matched.length.toLocaleString('zh-TW')+(kind?' 款有圖片網址的卡面':' 張卡牌');
+           $('#cardGrid').innerHTML=matched.slice(0,shownCards).map(({card:c,edition:v})=>{
+            const preview=catalogueTileArt(c,v,mode);if(!preview)return '';
+            const code=rarityCode(v?.rarity||c.rarity);
+            const kindLabel=kind?` · ${editionKindLabel(v.kind)}`:'';
+            const region=v?` · ${editionLocaleLabel(editionLocale(v.locale))}`:'';
+            const descriptor=kind?`${v.printId||c.id} · ${code}${kindLabel}${region}`:`${c.id} · ${code}${region}`;
+            return `<button class="cardtile" data-card="${safe(c.id)}" data-print-id="${safe(v?.printId||c.id)}" data-locale="${safe(v?.locale||'')}"><div class="coloredge" style="--edge:${cardColor(c)}"></div>${preview}<div class="cardmeta"><strong title="${safe(c.name)}">${safe(c.name)}</strong><small>${safe(descriptor)}</small></div></button>`;
+           }).join('')||'<div class="note">找不到符合條件且有圖片網址的卡面。</div>';
+           $('#moreCards').hidden=matched.length<=shownCards;
+          }
+          '''
+          start=s.index('function catalogueEditionRows(){')
+          end=s.index('// All card images across the PWA',start)
+          s=s[:start]+new_catalogue+s[end:]
+          
+          oldnav="if(page==='cards'){renderCards();if(!twPrintingsByCard)fetchPrintingsOnce().then(()=>{if(currentPage==='cards')renderCards();}).catch(()=>{});}"
+          newnav="if(page==='cards'){renderCards();if(!globalPrintingsByCard)fetchPrintingsOnce().then(()=>{if(currentPage==='cards')renderCards();}).catch(()=>{});}"
+          assert s.count(oldnav)==1, 'Unknown navigation handler'
+          s=s.replace(oldnav,newnav)
+          
+          handler_start=s.index("['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter'].forEach(")
+          handler_end=s.index("\n $('#moreCards')",handler_start)
+          s=s[:handler_start]+r'''['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter','#languageFilter'].forEach(id=>{
+            $(id).addEventListener(id==='#cardSearch'?'input':'change',()=>{
+             shownCards=72;renderCards();
+             if(!globalPrintingsByCard)fetchPrintingsOnce().then(()=>{
+              if(currentPage==='cards')renderCards();
+             }).catch(()=>{
+              if(currentPage==='cards'&&($('#printingKindFilter').value||$('#languageFilter').value)){
+               $('#cardCount').textContent='跨語言卡面索引暫時無法取得';
+               $('#cardGrid').innerHTML='<p class="note">版本來源目前無法讀取，可切換回全部卡牌查看既有卡庫。</p>';
+              }
+             });
+            });
+           });'''+s[handler_end:]
+          
+          # Also allow exact print ID lookup without destroying base-card search.
+          needle="return (!q||[c.name,c.id,c.effect,c.pack_id].some(v=>displayCardText(v).toLowerCase().includes(q)))"
+          assert s.count(needle)==1
+          s=s.replace(needle,"return (!q||[c.name,c.id,c.effect,c.pack_id].some(v=>displayCardText(v).toLowerCase().includes(q))||(globalPrintingsByCard&&globalVersions(c.id).some(v=>String(v.printId||'').toLowerCase().includes(q))))")
+          app_source=s
+          
+          select='<select id="printingKindFilter" aria-label="繁中版印刷版本"><option value="">全部卡牌</option><option value="base">一般版</option><option value="parallel">平行／異圖</option><option value="reprint">復刻版</option></select>'
+          assert index.count(select)==1, 'Four-option catalog select changed'
+          lang_select='<select id="languageFilter" aria-label="卡圖語言"><option value="">全部語言</option><option value="zh-TW">繁中（台灣）</option><option value="jp">日文</option><option value="en">英文</option><option value="en-asia">亞洲英文</option><option value="zh-HK">繁中（香港）</option><option value="cn">簡中</option><option value="tcgcsv">其他圖源</option></select>'
+          index=index.replace(select,select+lang_select)
+          index=index.replace('aria-label="繁中版印刷版本"','aria-label="印刷版本"')
+          assert index.count('v=13.4')==4
+          index=index.replace('v=13.4','v=13.5').replace('v13.4 · 更新紀錄','v13.5 · 更新紀錄')
+          
+          newcss=css.read_text('utf-8')
+          assert '.printingsGrid' in newcss
+          newcss += '''\n/* v13.5: all-language printing metadata with compact multi-lingual labels */
+          .editionLanguage{color:var(--gold);font-weight:650}
+          .editionLanguageSelect{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0;color:var(--sub);font-size:13px}
+          .editionLanguageSelect select{min-width:150px;max-width:100%;padding:9px 12px;background:var(--shell);border:1px solid var(--line);border-radius:9px;color:var(--txt)}
+          .globalPrintingStatus{margin:8px 0;color:var(--sub)}
+          @media(max-width:760px){.cardFilters #languageFilter{grid-column:auto}}
+          '''
+          
+          vs=history.read_text('utf-8')
+          assert '  const RELEASES = [' in vs and "version:'13.4'" in vs
+          vs=vs.replace('  const RELEASES = [', '''  const RELEASES = [
+              {version:'13.5', date:'2026-11-23', status:'全語言卡面', title:'跨語言全卡面檢索', changes:[
+                '從繁中、英文、亞洲英文、日文與其他有效圖源顯示不同卡面；保留四種篩選邏輯',
+                '新增圖片語言篩選，卡牌詳情集中查看所有語言的同卡號印刷版本',
+                '圖片載入失敗時僅嘗試相同卡面的官方網址備援；不以其他卡號替代，也不占空白版面',
+                '卡圖數量區分已有圖片網址與實際載入，未改動組牌、賽事與個人資料'
+              ]},''',1)
+          
+          cache=sw.read_text('utf-8')
+          assert cache.count('grand-decks-shell-v13-4-edition-views-1')==1
+          cache=cache.replace('grand-decks-shell-v13-4-edition-views-1','grand-decks-shell-v13-5-multilingual-printings-1')
+          
+          # All expected source locations were found. Commit staged changes atomically in the workflow.
+          app.write_text(app_source,'utf-8')
+          html.write_text(index,'utf-8')
+          css.write_text(newcss,'utf-8')
+          history.write_text(vs,'utf-8')
+          sw.write_text(cache,'utf-8')
+          print('v13.5 patched: all-language image URLs, four edition modes, language selectors, lazy image handling, source-credit retained')
+          PY
+
+      - name: Verify all original tests, image indexing and four display modes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node --check public/app.js
+          node --check public/results.js
+          node --check public/version-history.js
+          node --check public/sw.js
+          python -m json.tool public/data/cards.json >/dev/null
+          python -m json.tool public/data/printings.json >/dev/null
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('public')
+          html=(p/'index.html').read_text('utf-8')
+          app=(p/'app.js').read_text('utf-8')
+          assert 'v13.5 · 更新紀錄' in html
+          assert 'id="languageFilter"' in html
+          assert html.count('id="printingKindFilter"')==1
+          assert '全部卡牌</option><option value="base">一般版</option><option value="parallel">平行／異圖</option><option value="reprint">復刻版' in html
+          for needle in ("function globalVersions(", "function catalogueEditionRows(", "function showCardPrintings(", "function renderGlobalPrintingGallery("):
+              assert needle in app, needle
+          assert (p/'results.js').exists()
+          assert (p/'data/decks.json').exists()
+          data=json.loads((p/'data/printings.json').read_text('utf-8'))
+          assert data.get('printingCount',0)>=30000
+          samples=data.get('byCard',{}).get('OP01-001',[])
+          assert len([x for x in samples if x.get('locale')=='zh-TW' and x.get('image')])>=3
+          assert len([x for x in samples if x.get('locale')=='jp' and x.get('image')])>=3
+          assert len([x for x in samples if x.get('locale')=='en' and x.get('image')])>=3
+          print('Verified multi-lingual printing index:',data.get('printingCount'), 'source records')
+          PY
+          node <<'JS'
+          'use strict';
+          const assert=require('assert');
+          const fs=require('fs');
+          const vm=require('vm');
+          const path='public/app.js';
+          const app=fs.readFileSync(path,'utf8');
+          const start=app.indexOf('const EDITION_LOCALES = ');
+          const end=app.indexOf('async function fetchPrintingsOnce()',start);
+          const rowStart=app.indexOf('function catalogueEditionRows(){');
+          const rowEnd=app.indexOf('function catalogueTileArt(',rowStart);
+          assert(start>=0 && end>start && rowStart>=0 && rowEnd>rowStart,'v13.5 source anchors');
+          const url=(host,id)=>`https://${host}.onepiece-cardgame.com/images/cardlist/card/${id}.png`;
+          const data={
+           'OP01-001':[
+            {locale:'zh-TW',printId:'OP01-001',kind:'base',rarity:'Leader',image:url('asia-tw','OP01-001')},
+            {locale:'zh-TW',printId:'OP01-001_p1',kind:'parallel',rarity:'Leader',image:url('asia-tw','OP01-001_p1')},
+            {locale:'zh-TW',printId:'OP01-001_p2',kind:'parallel',rarity:'Leader',image:url('asia-tw','OP01-001_p2')},
+            {locale:'en',printId:'OP01-001',kind:'base',rarity:'Leader',image:url('en','OP01-001')},
+            {locale:'en',printId:'OP01-001_p1',kind:'parallel',rarity:'Leader',image:url('en','OP01-001_p1')},
+            {locale:'en',printId:'OP01-001_p2',kind:'parallel',rarity:'Leader',image:url('en','OP01-001_p2')},
+            {locale:'en-asia',printId:'OP01-001',kind:'base',rarity:'Leader',image:url('asia-en','OP01-001')},
+            {locale:'en-asia',printId:'OP01-001_p1',kind:'parallel',rarity:'Leader',image:url('asia-en','OP01-001_p1')},
+            {locale:'en-asia',printId:'OP01-001_p2',kind:'parallel',rarity:'Leader',image:url('asia-en','OP01-001_p2')},
+            {locale:'jp',printId:'OP01-001',kind:'base',rarity:'L',image:url('www','OP01-001')},
+            {locale:'jp',printId:'OP01-001_p1',kind:'parallel',rarity:'L',image:url('www','OP01-001_p1')},
+            {locale:'jp',printId:'OP01-001_p2',kind:'parallel',rarity:'L',image:url('www','OP01-001_p2')},
+            {locale:'jp',printId:'OP01-001_p3',kind:'parallel',rarity:'L',image:url('www','OP01-001_p3')},
+            {locale:'zh-HK',printId:'OP01-001',kind:'base',rarity:'Leader',image:''},
+            {locale:'cn',printId:'OP01-001',kind:'base',rarity:'L',image:''},
+            {locale:'en',printId:'OP01-001_p2',kind:'parallel',rarity:'Leader',image:url('en','OP01-001_p2')}
+           ],
+           'OP02-013':[
+            {locale:'zh-TW',printId:'OP02-013_r1',kind:'reprint',rarity:'SR',image:url('asia-tw','OP02-013_r1')},
+            {locale:'jp',printId:'OP02-013_r1',kind:'reprint',rarity:'SR',image:url('www','OP02-013_r1')}
+           ]
+          };
+          const filters={kind:'',lang:'',rarity:''};
+          const scope={URL};
+          vm.runInNewContext(`let globalPrintingsByCard=${JSON.stringify(data)};let cards=[{id:'OP01-001',rarity:'L'},{id:'OP02-013',rarity:'SR'}];\nconst $ = id=>({value:id==='#printingKindFilter'?filters.kind:id==='#rarityFilter'?filters.rarity:id==='#languageFilter'?filters.lang:''});\nconst filters=globalThis.filters;\nfunction cardMatches(){return true;}\n${app.slice(start,end)}\n${app.slice(rowStart,rowEnd)}\nglobalThis.api={globalVersions,supportedPrintingImage,printingImageCandidates,versionKind,editionLocale,catalogueEditionRows};`,Object.assign(scope,{filters}));
+          const f=scope.api;
+          assert.equal(f.globalVersions('OP01-001').length,13,'13 cross-language image URLs, duplicate URL and text-only omitted');
+          assert.equal(f.globalVersions('OP01-001','zh-TW').length,3);
+          assert.equal(f.globalVersions('OP01-001','jp').length,4);
+          assert.equal(f.globalVersions('OP01-001','en').length,3);
+          assert.equal(f.globalVersions('OP01-001','en-asia').length,3);
+          assert.equal(f.globalVersions('OP01-001','cn').length,0);
+          assert.equal(f.globalVersions('OP01-001','zh-HK').length,0);
+          assert.equal(f.supportedPrintingImage('https://evil.example.com/images/cardlist/card/OP01-001.png'),false);
+          assert.equal(f.supportedPrintingImage('javascript:alert(1)'),false);
+          assert.equal(f.printingImageCandidates(f.globalVersions('OP01-001','jp')[0]).length,2,'official JP URL alias');
+          assert.equal(f.printingImageCandidates(f.globalVersions('OP01-001','zh-TW')[0]).length,2,'official TW URL alias');
+          assert.equal(f.versionKind('alternate'),'parallel');
+          assert.equal(f.versionKind('reprint'),'reprint');
+          filters.kind=''; assert.equal(f.catalogueEditionRows().length,2,'all mode unique base IDs');
+          filters.kind='base'; assert.equal(f.catalogueEditionRows().length,4,'all languages individual base records');
+          filters.kind='parallel'; assert.equal(f.catalogueEditionRows().length,9,'all languages individual parallels');
+          filters.kind='reprint'; assert.equal(f.catalogueEditionRows().length,2,'all languages individual reprints');
+          filters.lang='jp'; assert.equal(f.catalogueEditionRows().length,1,'JP reprint filter');
+          filters.kind='parallel'; assert.equal(f.catalogueEditionRows().length,3,'JP parallel filter');
+          filters.lang='zh-TW'; assert.equal(f.catalogueEditionRows().length,2,'TW parallel filter');
+          filters.kind=''; assert.equal(f.catalogueEditionRows().length,2,'all IDs in TW');
+          console.log('PASS: 15 cross-language card index and rendering-mode checks');
+          JS
+
+      - name: Publish only verified website changes to existing main branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/index.html public/style.css public/sw.js public/version-history.js
+          if git diff --cached --quiet; then
+            echo 'Already up to date: no changes, no failure.'
+            exit 0
+          fi
+          git commit -m 'feat: GRAND DECKS v13.5 multilingual all-art gallery'
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo 'v13.5 pushed to existing main. Check connected Cloudflare deployment.'
