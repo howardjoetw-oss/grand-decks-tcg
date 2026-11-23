@@ -1,0 +1,220 @@
+name: GRAND DECKS - Restore v13.4 and add in-dialog card preview (v13.6)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grand-decks-daily-sync
+  cancel-in-progress: false
+
+jobs:
+  restore-and-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout existing project with history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply v13.4 recovery and preview enhancement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          """Restore v13.4 edition views, add in-dialog preview. Executed in GH Actions checkout."""
+          from pathlib import Path
+          import subprocess
+
+          root=Path.cwd()
+          indexpath=root/'public/index.html'
+          assert indexpath.exists(), 'Missing website root'
+          existing=indexpath.read_text('utf-8')
+          if 'v13.6 · 更新紀錄' in existing:
+              print('v13.6 already installed; no changes required.')
+              raise SystemExit(0)
+          assert 'v13.5 · 更新紀錄' in existing, 'Expected current v13.5; refusing to overwrite an unknown version.'
+          base='fc213023fd1f45e17f059b42f52f3f2f39cad97a' # verified v13.4 commit
+          paths=['public/app.js','public/index.html','public/style.css','public/sw.js','public/version-history.js']
+          for path in paths:
+              result=subprocess.run(['git','show',f'{base}:{path}'],capture_output=True,text=True,check=True)
+              (root/path).write_text(result.stdout,'utf-8')
+
+          app=root/'public/app.js'
+          s=app.read_text('utf-8')
+
+          def replace_one(old,new,label):
+              global s
+              assert s.count(old)==1, f'{label}: expected one anchor, found {s.count(old)}'
+              s=s.replace(old,new,1)
+
+          # Keep version cards inside the detail dialog; never open the official site in another window.
+          old='<a target="_blank" rel="noopener noreferrer" href="${safe(url)}"><img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandTaiwanImageFailed(this)"></a><strong>${safe(id)}</strong><small><span class="twRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(taiwanVersionKindLabel(v.kind))} · zh-TW</small>'
+          new='<button type="button" class="printingPreview" aria-pressed="false" aria-label="在此視窗預覽 ${safe(title)}"><img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandTaiwanImageFailed(this)"><strong>${safe(id)}</strong><small><span class="twRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(taiwanVersionKindLabel(v.kind))} · zh-TW</small></button>'
+          replace_one(old,new,'version buttons')
+
+          # Use preloaded, already-visible thumbnail. Keep current main image until replacement actually loads.
+          helper='''function selectCardPrintingPreview(button){
+           const panel=button?.closest('#cardPrintingsPanel');
+           const hero=document.getElementById('cardDetailMainArt');
+           const thumb=button?.querySelector('img');
+           const dialog=document.getElementById('cardDialog');
+           if(!panel||!hero||!thumb||!dialog?.open||!thumb.complete||!thumb.naturalWidth)return false;
+           const url=thumb.currentSrc||thumb.src;
+           if(!TW_CARD_IMAGE.test(url))return false;
+           const token=String(Number(hero.dataset.previewToken||0)+1);
+           hero.dataset.previewToken=token;
+           const next=new Image();
+           next.alt=thumb.alt||'卡面預覽';
+           next.decoding='async';
+           next.onload=()=>{
+            // Ignore late image events after the user selects another version or dialog changes.
+            if(!hero.isConnected||!panel.isConnected||hero.dataset.previewToken!==token||!dialog.open)return;
+            hero.replaceChildren(next);
+            panel.querySelectorAll('.printingPreview').forEach(item=>item.setAttribute('aria-pressed',item===button?'true':'false'));
+           };
+           next.onerror=()=>{ /* Leave the previous visible card untouched. */ };
+           next.src=url;
+           return true;
+          }
+          '''
+          marker='async function showCardPrintings(cardId) {'
+          replace_one(marker,helper+marker,'preview helper')
+          replace_one(
+           "   '<p class=\"tiny\">圖片直接連結台灣卡圖來源；版本索引來自 <a href=\"https://github.com/buhbbl/punk-records\" target=\"_blank\" rel=\"noopener noreferrer\">Punk Records</a>。卡面與文字權利歸原權利人所有。</p>';",
+           "   '<p class=\"tiny\">點選縮圖可在上方切換卡面預覽，卡牌能力與組牌規則不變。版本索引來自 <a href=\"https://github.com/buhbbl/punk-records\" target=\"_blank\" rel=\"noopener noreferrer\">Punk Records</a>；美術及文字權利歸原權利人。</p>';\n  current.querySelector('.printingsGrid')?.addEventListener('click',event=>{\n   const button=event.target.closest('button.printingPreview');\n   if(button&&current.contains(button))selectCardPrintingPreview(button);\n  });",
+           'delegate preview clicks')
+          # Mark only the detail's large artwork container; no impact on grid, deck builder or cards elsewhere.
+          replace_one(
+           '${art(c)}<div class="cardDetailContent">',
+           '${art(c).replace(\'class="cardart"\',\'class="cardart" id="cardDetailMainArt"\')}<div class="cardDetailContent">',
+           'hero main art')
+          # If every fallback fails on the catalogue page, remove its empty tile (not from other app areas).
+          replace_one(
+           "  img.parentElement?.classList.add('artUnavailable');\n  img.remove(); // The card ID stays visible; never replace with an unrelated card.",
+           "  const brokenTile=img.closest('#cardGrid .cardtile');\n  if(brokenTile){brokenTile.remove();return;}\n  img.parentElement?.classList.add('artUnavailable');\n  img.remove(); // Other screens keep the original fallback behavior.",
+           'empty tile suppression')
+          # All tab still uses one card per ID and prefers its standard image. Other tabs remain per-printing.
+          assert 'const editions=taiwanVersions(c.id);' in s
+          assert "if(!kind){" in s
+          assert 'return rows;' in s
+          app.write_text(s,'utf-8')
+
+          htmlfile=root/'public/index.html'
+          html=htmlfile.read_text('utf-8')
+          assert 'v13.4 · 更新紀錄' in html
+          html=html.replace('v13.4 · 更新紀錄','v13.6 · 更新紀錄')
+          html=html.replace('v=13.4','v=13.6')
+          assert 'id="languageFilter"' not in html
+          htmlfile.write_text(html,'utf-8')
+
+          stylefile=root/'public/style.css'
+          css=stylefile.read_text('utf-8')
+          css+='''
+          /* v13.6: in-dialog selection of versions without external navigation. */
+          .printingCard{padding:0}
+          .printingPreview{width:100%;padding:7px;border:0;color:inherit;background:transparent;font:inherit;text-align:left;cursor:pointer;border-radius:9px}
+          .printingPreview strong,.printingPreview small{display:block;overflow-wrap:anywhere;margin-top:5px}
+          .printingPreview[aria-pressed="true"]{outline:2px solid var(--gold);outline-offset:-2px;background:#27364e}
+          .printingPreview:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+          '''
+          stylefile.write_text(css,'utf-8')
+
+          swfile=root/'public/sw.js'
+          sw=swfile.read_text('utf-8')
+          assert "grand-decks-shell-v13-4-edition-views-1" in sw
+          sw=sw.replace('grand-decks-shell-v13-4-edition-views-1','grand-decks-shell-v13-6-preview-artwork-1')
+          swfile.write_text(sw,'utf-8')
+
+          historyfile=root/'public/version-history.js'
+          hist=historyfile.read_text('utf-8')
+          assert '  const RELEASES = [' in hist
+          hist=hist.replace('  const RELEASES = [', '''  const RELEASES = [
+              {version:'13.6', date:'2026-11-23', status:'顯示回復與操作優化', title:'回復 v13.4 卡面分類、點選版本就地預覽', changes:[
+                '移除 v13.5 全語言分頁，回復 v13.4 主卡庫及三種逐張卡面篩選',
+                '卡牌詳情點選不同卡面縮圖，直接替換上方主預覽圖，不另開視窗',
+                '未成功載入的卡圖不顯示空白格，保留原組牌、賽事及本機牌組資料'
+              ]},''',1)
+          historyfile.write_text(hist,'utf-8')
+          print('Restored tested v13.4 display logic and applied in-dialog preview v13.6.')
+          PY
+
+      - name: Validate application, data integrity and interaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check beautifulsoup4==4.12.3
+          python -m unittest discover -s scripts -p 'test_*.py' -v
+          node --check public/app.js
+          node --check public/results.js
+          node --check public/version-history.js
+          node --check public/sw.js
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('public')
+          html=(p/'index.html').read_text('utf-8')
+          js=(p/'app.js').read_text('utf-8')
+          assert 'v13.6 · 更新紀錄' in html
+          assert 'id="languageFilter"' not in html
+          assert 'id="printingKindFilter"' in html
+          assert '全部卡牌</option><option value="base">一般版</option><option value="parallel">平行／異圖</option><option value="reprint">復刻版' in html
+          assert '<button type="button" class="printingPreview"' in js
+          assert 'selectCardPrintingPreview(button)' in js
+          assert 'id="cardDetailMainArt"' in js
+          assert (p/'results.js').is_file() and (p/'data/cards.json').is_file() and (p/'data/printings.json').is_file()
+          prints=json.loads((p/'data/printings.json').read_text('utf-8'))
+          zoro=[x for x in prints['byCard'].get('OP01-001',[]) if x.get('locale')=='zh-TW' and x.get('image')]
+          assert len(zoro)>=3, f'Expected zoro normal and alternate arts, got {len(zoro)}'
+          print('PASS: previous four display options, source files, and OP01-001 image versions')
+          PY
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const s=fs.readFileSync('public/app.js','utf8');
+          const re=s.match(/^const TW_CARD_IMAGE = .*;$/m)?.[0];
+          const start=s.indexOf('function selectCardPrintingPreview(button){');
+          const end=s.indexOf('async function showCardPrintings(cardId)',start);
+          assert(re && start>0 && end>start, 'Missing preview handler and approved URL guard');
+          const hero={dataset:{},isConnected:true,replaceChildren(next){this.image=next;}};
+          const dialog={open:true};
+          const buttons=[];
+          const panel={isConnected:true,querySelectorAll(q){assert(q==='.printingPreview');return buttons;}};
+          const thumb={complete:true,naturalWidth:400,currentSrc:'https://asia-tw.onepiece-cardgame.com/images/cardlist/card/OP01-001_p1.png',alt:'OP01-001_p1'};
+          const button={closest(q){return q==='#cardPrintingsPanel'?panel:null;},querySelector(q){return q==='img'?thumb:null;},setAttribute(k,v){this[k]=v;}};
+          const other={setAttribute(k,v){this[k]=v;}};
+          buttons.push(button,other);
+          class FakeImage{set src(url){this._url=url;if(this.onload)this.onload();}get src(){return this._url;}}
+          const ctx={document:{getElementById(id){return id==='cardDetailMainArt'?hero:id==='cardDialog'?dialog:null;}},Image:FakeImage};
+          vm.runInNewContext(re+'\n'+s.slice(start,end)+'\nglobalThis.testPreview=selectCardPrintingPreview;',ctx);
+          assert.strictEqual(ctx.testPreview(button),true,'Tapping loaded version must select image');
+          assert.strictEqual(hero.image.src,thumb.currentSrc,'Hero image should equal thumbnail selected');
+          assert.strictEqual(button['aria-pressed'],'true');
+          assert.strictEqual(other['aria-pressed'],'false');
+          thumb.complete=false;
+          assert.strictEqual(ctx.testPreview(button),false,'Unloaded thumbnail must not replace hero image');
+          assert.strictEqual(hero.image.src,thumb.currentSrc);
+          assert(s.includes('class="printingPreview"'), 'Gallery versions must be buttons');
+          assert(!s.includes('<a target="_blank" rel="noopener noreferrer" href="${safe(url)}"><img'), 'Gallery must not open a new tab');
+          console.log('Interactive detail preview and loaded-image safety tests passed');
+          JS
+
+      - name: Commit validated v13.6 changes to original main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/index.html public/style.css public/sw.js public/version-history.js
+          if git diff --cached --quiet; then
+            echo 'Already installed; no changes needed.'
+            exit 0
+          fi
+          git commit -m 'fix: restore v13.4 catalogue and preview selected card art in dialog'
+          git pull --rebase origin main
+          git push origin HEAD:main
+          echo 'v13.6 pushed to original main; verify Cloudflare Pages production.'
