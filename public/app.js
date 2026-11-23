@@ -9,16 +9,22 @@ const CARD_SNAPSHOT_URL = './data/cards.json';
 const SYNC_STATUS_URL = './data/sync-status.json';
 const PRINTINGS_URL = './data/printings.json';
 let printingsRequest = null;
-let globalPrintingsByCard = null;
-const EDITION_LOCALES = ['zh-TW','jp','en','en-asia','zh-HK','cn','tcgcsv'];
-const GLOBAL_IMAGE_URL = /^https:\/\/(?:(?:(?:asia-tw|asia-tc|en|asia-en|jp|www)\.onepiece-cardgame\.com|onepiece-cardgame\.com)\/images\/cardlist\/card\/[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)|tcgplayer-cdn\.tcgplayer\.com\/product\/[A-Za-z0-9_./-]+\.(?:png|jpe?g|webp))(?:\?[^"'<>]*)?$/i;
-function supportedPrintingImage(value){return GLOBAL_IMAGE_URL.test(String(value||''));}
-function editionLocale(value){
- const k=String(value||'').trim().toLowerCase();
- return ({'zh-tw':'zh-TW','jp':'jp','ja':'jp','ja-jp':'jp','en':'en','en-asia':'en-asia','zh-hk':'zh-HK','cn':'cn','zh-cn':'cn','tcgcsv':'tcgcsv'})[k]||k;
+let twPrintingsByCard = null;
+// Taiwan Traditional Chinese edition artworks, as used in v13.0. Do not mix in JP/EN duplicates.
+const TW_CARD_IMAGE = /^https:\/\/(?:asia-tw|asia-tc)\.onepiece-cardgame\.com\/images\/cardlist\/card\/[a-z0-9_-]+\.(?:png|jpe?g|webp)(?:\?[^"'<>]*)?$/i;
+function isTaiwanImageVersion(v) {
+ return !!v && String(v.locale||'').toLowerCase()==='zh-tw' && TW_CARD_IMAGE.test(String(v.image||''));
 }
-function editionLocaleLabel(locale){
- return ({'zh-TW':'繁中（台灣）','jp':'日文','en':'英文','en-asia':'亞洲英文','zh-HK':'繁中（香港）','cn':'簡中','tcgcsv':'其他圖源'})[locale]||locale;
+function taiwanVersions(cardId) {
+ const rows=twPrintingsByCard?.[cardId]||[];
+ const unique=new Map();
+ for(const v of rows) {
+  if(!isTaiwanImageVersion(v))continue;
+  // Remove only identical image duplicates, not distinct parallel artwork.
+  const image=String(v.image).split('?')[0].toLowerCase();
+  if(!unique.has(image))unique.set(image,v);
+ }
+ return [...unique.values()].sort((a,b)=>(a.kind==='base'?0:1)-(b.kind==='base'?0:1)||String(a.printId).localeCompare(String(b.printId),'zh-TW',{numeric:true}));
 }
 function rarityCode(raw) {
  const value=String(raw||'').trim();
@@ -29,116 +35,92 @@ function versionKind(raw) {
  const kind=String(raw||'').toLowerCase();
  return ({normal:'base',original:'base',alternate:'parallel',altart:'parallel',alt:'parallel',specialart:'special'})[kind]||kind||'unknown';
 }
-function editionKindLabel(raw){
- return ({base:'一般版',parallel:'平行／異圖',reprint:'復刻版',special:'特殊版',manga:'漫畫版',promo:'宣傳版',unknown:'其他'})[versionKind(raw)]||'其他';
+function taiwanVersionKindLabel(raw) {
+ const kind=versionKind(raw);
+ return ({base:'一般版',parallel:'平行／異圖',reprint:'復刻版',special:'特殊版',manga:'漫畫版',promo:'宣傳版',unknown:'其他版本'})[kind]||'其他版本';
 }
-function globalVersions(cardId,selectedLocale='') {
- const locale=editionLocale(selectedLocale);
- const rows=globalPrintingsByCard?.[cardId]||[];
- const unique=new Map();
- for(const entry of rows){
-  if(!entry || !supportedPrintingImage(entry.image))continue;
-  if(locale && editionLocale(entry.locale)!==locale)continue;
-  // Same URL (ignoring cache-bust query) is the same displayed asset; different
-  // languages/artworks or reprints must not be merged just because IDs match.
-  const key=String(entry.image).split('?')[0].toLowerCase();
-  if(!unique.has(key))unique.set(key,entry);
- }
- return [...unique.values()].sort((a,b)=>{
-  const la=EDITION_LOCALES.indexOf(editionLocale(a.locale));
-  const lb=EDITION_LOCALES.indexOf(editionLocale(b.locale));
-  const al=la<0?99:la,bl=lb<0?99:lb;
-  const order={base:0,parallel:1,reprint:2};
-  return al-bl || (order[versionKind(a.kind)]??4)-(order[versionKind(b.kind)]??4) || String(a.printId||'').localeCompare(String(b.printId||''),'en',{numeric:true});
- });
-}
-function printingImageCandidates(entry){
- const url=String(entry?.image||'');
- if(!supportedPrintingImage(url))return [];
- const out=[url];
- // Only two alternate *official* hostname aliases for the identical edition URL.
- // No unrelated artwork or silently relabelled translations.
- const aliases={
-  'asia-tw.onepiece-cardgame.com':'asia-tc.onepiece-cardgame.com',
-  'asia-tc.onepiece-cardgame.com':'asia-tw.onepiece-cardgame.com',
-  'www.onepiece-cardgame.com':'jp.onepiece-cardgame.com',
-  'jp.onepiece-cardgame.com':'www.onepiece-cardgame.com'
- };
- try{
-  const parsed=new URL(url), next=aliases[parsed.hostname];
-  if(next){parsed.hostname=next;if(supportedPrintingImage(parsed.href))out.push(parsed.href);}
- }catch{}
- return [...new Set(out)];
-}
-async function fetchPrintingsOnce(){
+async function fetchPrintingsOnce() {
  if(!printingsRequest){
   printingsRequest=fetchJson(PRINTINGS_URL+'?v='+Date.now()).then(data=>{
-   if(!data?.byCard||typeof data.byCard!=='object')throw Error('跨語言卡面索引格式無效');
-   globalPrintingsByCard=data.byCard;
+   if(!data?.byCard||typeof data.byCard!=='object')throw Error('繁中卡面資料格式無效');
+   twPrintingsByCard=data.byCard;
    return data;
   }).catch(err=>{printingsRequest=null;throw err;});
  }
  return printingsRequest;
 }
-function updateGlobalPrintingCount(panel){
+function updateTaiwanVersionCount(panel) {
  if(!panel)return;
- const remaining=panel.querySelectorAll('.printingCard').length;
- const tally=panel.querySelector('[data-global-shown]');if(tally)tally.textContent=String(remaining);
- const total=Number(panel.dataset.globalSourceCount||0);
- const note=panel.querySelector('.globalPrintingStatus');
- if(note)note.textContent=total>remaining
-  ? `已篩選 ${total} 款有圖片網址的紀錄，其中 ${total-remaining} 款圖片目前載入失敗，未佔用卡片版面。`
-  : '僅收錄有圖片網址的紀錄；圖片由原來源網站提供。';
+ const available=panel.querySelectorAll('.printingCard').length;
+ const recorded=Number(panel.dataset.twSourceCount||available);
+ const label=panel.querySelector('[data-tw-count]');
+ if(label)label.textContent=String(available);
+ const source=panel.querySelector('[data-tw-source-count]');
+ if(source)source.textContent=String(recorded);
+ let note=panel.querySelector('.twNoPrintings');
+ if(!available){
+  if(!note){
+   const grid=panel.querySelector('.printingsGrid');
+   if(grid){grid.insertAdjacentHTML('afterend','<p class="twNoPrintings tiny"></p>');note=panel.querySelector('.twNoPrintings');}
+  }
+  if(note)note.textContent=recorded
+    ? `已收錄 ${recorded} 款繁中版卡面，但圖片載入失敗；這不表示資料庫沒有版本。`
+    : '目前沒有已收錄圖片網址的繁中版卡面。';
+ } else if(note)note.remove();
 }
-function tryNextPrintingImage(img,removeClass){
- if(!img||!img.isConnected)return;
- let sources=[];try{sources=JSON.parse(img.dataset.editionSources||'[]');}catch{}
- const next=(Number(img.dataset.editionIndex)||0)+1;
- if(next<sources.length){
-  img.dataset.editionIndex=String(next);
-  img.src=sources[next];
-  const anchor=img.closest('a');if(anchor)anchor.href=sources[next];
-  return;
- }
- const panel=img.closest('#cardPrintingsPanel');
- img.closest(removeClass)?.remove();
- if(panel)updateGlobalPrintingCount(panel);
+window.grandTaiwanImageFailed=function(img) {
+ const panel=img?.closest('#cardPrintingsPanel');
+ img?.closest('.printingCard')?.remove();
+ updateTaiwanVersionCount(panel);
+};
+function selectCardPrintingPreview(button){
+ const panel=button?.closest('#cardPrintingsPanel');
+ const hero=document.getElementById('cardDetailMainArt');
+ const thumb=button?.querySelector('img');
+ const dialog=document.getElementById('cardDialog');
+ if(!panel||!hero||!thumb||!dialog?.open||!thumb.complete||!thumb.naturalWidth)return false;
+ const url=thumb.currentSrc||thumb.src;
+ if(!TW_CARD_IMAGE.test(url))return false;
+ const token=String(Number(hero.dataset.previewToken||0)+1);
+ hero.dataset.previewToken=token;
+ const next=new Image();
+ next.alt=thumb.alt||'卡面預覽';
+ next.decoding='async';
+ next.onload=()=>{
+  // Ignore late image events after the user selects another version or dialog changes.
+  if(!hero.isConnected||!panel.isConnected||hero.dataset.previewToken!==token||!dialog.open)return;
+  hero.replaceChildren(next);
+  panel.querySelectorAll('.printingPreview').forEach(item=>item.setAttribute('aria-pressed',item===button?'true':'false'));
+ };
+ next.onerror=()=>{ /* Leave the previous visible card untouched. */ };
+ next.src=url;
+ return true;
 }
-window.grandEditionTileError=img=>tryNextPrintingImage(img,'.cardtile');
-window.grandEditionDetailError=img=>tryNextPrintingImage(img,'.printingCard');
-function renderGlobalPrintingGallery(cardId,lang=''){
+async function showCardPrintings(cardId) {
  const panel=document.getElementById('cardPrintingsPanel');
  if(!panel||panel.dataset.cardId!==cardId)return;
- const rows=globalVersions(cardId,lang);
- panel.dataset.globalSourceCount=String(rows.length);
- const gallery=panel.querySelector('.printingsGrid');
- if(!gallery)return;
- gallery.innerHTML=rows.map(v=>{
-  const sources=printingImageCandidates(v),url=sources[0];if(!url)return '';
-  const pid=String(v.printId||cardId),locale=editionLocale(v.locale);
-  const label=pid+' · '+editionLocaleLabel(locale);
-  return `<div class="printingCard"><a href="${safe(url)}" target="_blank" rel="noopener noreferrer" aria-label="開啟 ${safe(label)} 原圖"><img src="${safe(url)}" data-edition-sources="${safe(JSON.stringify(sources))}" data-edition-index="0" loading="lazy" decoding="async" alt="${safe(label)}" onerror="window.grandEditionDetailError(this)"></a><strong>${safe(pid)}</strong><small><span class="twRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(editionKindLabel(v.kind))}</small><small class="editionLanguage">${safe(editionLocaleLabel(locale))} · ${safe(locale)}</small></div>`;
- }).join('');
- updateGlobalPrintingCount(panel);
-}
-async function showCardPrintings(cardId){
- const panel=document.getElementById('cardPrintingsPanel');
- if(!panel||panel.dataset.cardId!==cardId)return;
- try{
+ try {
   await fetchPrintingsOnce();
   const current=document.getElementById('cardPrintingsPanel');
   if(!current||current.dataset.cardId!==cardId||!$('#cardDialog').open)return;
-  const all=globalVersions(cardId);
-  current.innerHTML=`<h3>卡面與印刷版本（全部語言） · 來源 <span>${all.length}</span> 款</h3>`+
-   '<p class="tiny">所有語言的不同卡面集中顯示。同一卡號、不同語言／異圖不增加組牌可用張數。</p>'+
-   '<label class="editionLanguageSelect">圖片語言 <select id="detailLocaleFilter"><option value="">全部語言</option>'+EDITION_LOCALES.map(l=>`<option value="${safe(l)}">${safe(editionLocaleLabel(l))}</option>`).join('')+'</select></label>'+
-   '<p class="tiny globalPrintingStatus" aria-live="polite"></p><div class="printingsGrid"></div>'+
-   '<p class="tiny">版本索引：<a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records</a>、<a href="https://github.com/hotavocado/koala-kollect-data" target="_blank" rel="noopener noreferrer">Koala Kollect（CC BY 4.0）</a>。美術權利歸原權利人；無法存取的外部圖片不會冒充已驗證成功。</p>';
-  current.querySelector('#detailLocaleFilter')?.addEventListener('change',event=>renderGlobalPrintingGallery(cardId,event.target.value));
-  renderGlobalPrintingGallery(cardId);
- }catch(err){
+  const versions=taiwanVersions(cardId);
+  current.dataset.twSourceCount=String(versions.length);
+  current.innerHTML=`<h3>卡面與印刷版本（繁中）· <span data-tw-count>${versions.length}</span> 款 <small class="twSourceCount">（來源收錄 <span data-tw-source-count>${versions.length}</span> 款）</small></h3>`+
+   (versions.length?'<p class="tiny">僅顯示台灣繁體中文（zh-TW）有卡圖的版本；同卡號異圖不增加組牌可用張數。</p><div class="printingsGrid">'+
+    versions.map(v=>{
+     const url=String(v.image||'');
+     const id=String(v.printId||cardId);
+     const title=`${id} · 繁中版`;
+     return `<div class="printingCard"><button type="button" class="printingPreview" aria-pressed="false" aria-label="在此視窗預覽 ${safe(title)}"><img loading="lazy" decoding="async" src="${safe(url)}" alt="${safe(title)}" onerror="window.grandTaiwanImageFailed(this)"><strong>${safe(id)}</strong><small><span class="twRarity">${safe(rarityCode(v.rarity))}</span> · ${safe(taiwanVersionKindLabel(v.kind))} · zh-TW</small></button></div>`;
+    }).join('')+'</div>':'<p class="twNoPrintings tiny">目前沒有已收錄圖片網址的繁中版卡面。</p>')+
+   '<p class="tiny">點選縮圖可在上方切換卡面預覽，卡牌能力與組牌規則不變。版本索引來自 <a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records</a>；美術及文字權利歸原權利人。</p>';
+  current.querySelector('.printingsGrid')?.addEventListener('click',event=>{
+   const button=event.target.closest('button.printingPreview');
+   if(button&&current.contains(button))selectCardPrintingPreview(button);
+  });
+ } catch(err){
   const current=document.getElementById('cardPrintingsPanel');
-  if(current&&current.dataset.cardId===cardId)current.textContent='跨語言版本資料目前無法取得；既有卡牌、組牌與賽事資料不受影響。';
+  if(current&&current.dataset.cardId===cardId)current.textContent='目前無法讀取繁中版本資料，原有卡牌與牌組不受影響。';
  }
 }
 
@@ -166,7 +148,7 @@ const get=key=>kv('get',key);const put=(key,val)=>kv('put',key,val);
 const count=()=>Object.values(currentDeck.items||{}).reduce((a,b)=>a+Number(b||0),0);
 const byId=id=>{if(indexedCards!==cards){cardIndex=new Map(cards.map(c=>[c.id,c]));indexedCards=cards;}return cardIndex.get(String(id||'').split('_')[0]);};
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3500);}
-function nav(page){if(!$('#page-'+page))return;currentPage=page;$$('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));window.scrollTo({top:0,behavior:'instant'});if(page==='home')renderHome();if(page==='cards'){renderCards();if(!globalPrintingsByCard)fetchPrintingsOnce().then(()=>{if(currentPage==='cards')renderCards();}).catch(()=>{});}if(page==='builder')renderBuilder();if(page==='decks')renderDecks();if(page==='data')renderData();if(page==='results'||page==='meta')window.renderResults?.(page);}
+function nav(page){if(!$('#page-'+page))return;currentPage=page;$$('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));window.scrollTo({top:0,behavior:'instant'});if(page==='home')renderHome();if(page==='cards'){renderCards();if(!twPrintingsByCard)fetchPrintingsOnce().then(()=>{if(currentPage==='cards')renderCards();}).catch(()=>{});}if(page==='builder')renderBuilder();if(page==='decks')renderDecks();if(page==='data')renderData();if(page==='results'||page==='meta')window.renderResults?.(page);}
 function cardColor(card){const c=card.colors?.[0];return COLORS[c]?.[1]||'#b9a47b';}
 function dots(card){return (card.colors||[]).map(c=>`<span class="dot" title="${COLORS[c]?.[0]||safe(c)}" style="background:${COLORS[c]?.[1]||'#9aa'}"></span>`).join('');}
 /* Card artwork fallback. Only public HTTPS image URLs; no downloading or copying art. */
@@ -192,8 +174,10 @@ window.grandImageFallback=function(img){
   let sources=[];try{sources=JSON.parse(img.dataset.grandArt);}catch{}
   const next=(Number(img.dataset.grandArtIndex)||0)+1;
   if(next<sources.length){img.dataset.grandArtIndex=String(next);img.src=sources[next];return;}
+  const brokenTile=img.closest('#cardGrid .cardtile');
+  if(brokenTile){brokenTile.remove();return;}
   img.parentElement?.classList.add('artUnavailable');
-  img.remove(); // The card ID stays visible; never replace with an unrelated card.
+  img.remove(); // Other screens keep the original fallback behavior.
 };
 window.grandImageLoaded=function(img){if(img?.parentElement)img.parentElement.classList.remove('artUnavailable');};
 function cardImageTag(card,classes=''){
@@ -231,62 +215,66 @@ function updateSetFilter(){
 function cardMatches(c){
  const q=$('#cardSearch').value.trim().toLowerCase();
  const color=$('#colorFilter').value,type=$('#typeFilter').value,set=$('#setFilter').value;
- return (!q||[c.name,c.id,c.effect,c.pack_id].some(v=>displayCardText(v).toLowerCase().includes(q))||(globalPrintingsByCard&&globalVersions(c.id).some(v=>String(v.printId||'').toLowerCase().includes(q))))
+ return (!q||[c.name,c.id,c.effect,c.pack_id].some(v=>displayCardText(v).toLowerCase().includes(q)))
    &&(!color||c.colors.includes(color))&&(!type||c.category===type)&&(!set||c.pack_id===set);
 }
 function catalogueEditionRows(){
  const kind=$('#printingKindFilter').value;
  const rarity=$('#rarityFilter').value;
- const locale=$('#languageFilter').value;
  const rows=[],seenIds=new Set();
  for(const c of cards){
+  // The catalogue itself is canonical; defend against duplicate imported IDs.
   if(!c?.id||seenIds.has(c.id)||!cardMatches(c))continue;
   seenIds.add(c.id);
-  const entries=globalVersions(c.id,locale);
+  const editions=taiwanVersions(c.id);
   if(!kind){
-   // One canonical card ID per result; show base in preferred language first.
-   if(locale&&!entries.length)continue;
-   const base=entries.find(v=>versionKind(v.kind)==='base')||entries[0]||null;
+   // "全部卡牌": one tile per original card number, using normal art first.
+   const base=editions.find(v=>versionKind(v.kind)==='base')||null;
    if(rarity&&rarityCode(base?.rarity||c.rarity)!==rarity)continue;
    rows.push({card:c,edition:base});
-  }else{
-   // Each unique image link is an independent printing result, regardless of ID.
-   for(const v of entries){
-    if(versionKind(v.kind)!==kind)continue;
-    if(rarity&&rarityCode(v.rarity||c.rarity)!==rarity)continue;
-    rows.push({card:c,edition:v});
+  } else {
+   // A selected edition category is a flattened artwork catalogue. Same ID
+   // may appear repeatedly for different physical images/printing IDs.
+   for(const edition of editions){
+    if(versionKind(edition.kind)!==kind)continue;
+    if(rarity&&rarityCode(edition.rarity||c.rarity)!==rarity)continue;
+    rows.push({card:c,edition});
    }
   }
  }
  return rows;
 }
 function catalogueTileArt(card,edition,mode){
- let sources=edition?printingImageCandidates(edition):[];
- if(mode==='all'&&!sources.length)sources=cardImageCandidates(card);
- if(!sources.length)return '';
- const id=String(edition?.printId||card.id);
- return `<div class="cardart"><span class="artText">${safe(id)}</span><img src="${safe(sources[0])}" data-edition-sources="${safe(JSON.stringify(sources))}" data-edition-index="0" alt="${safe(card.name)} · ${safe(id)}" loading="lazy" decoding="async" onerror="window.grandEditionTileError(this)"></div>`;
+ if(mode==='all'){
+  // Prefer zh-TW normal edition, then retain v13 normal-card fallbacks.
+  return art(edition?.image?{...card,image:edition.image}:card);
+ }
+ const image=String(edition?.image||'');
+ if(!TW_CARD_IMAGE.test(image))return '';
+ const label=String(edition.printId||card.id);
+ return `<div class="cardart"><span class="artText">${safe(label)}</span><img src="${safe(image)}" alt="${safe(card.name)} · ${safe(label)}" loading="lazy" decoding="async" onerror="window.grandCatalogueEditionFailed(this)"></div>`;
 }
+window.grandCatalogueEditionFailed=function(img){
+ // Do not replace a parallel/reprint with unrelated normal artwork.
+ img?.closest('.cardtile')?.remove();
+};
 function renderCards(){
  const kind=$('#printingKindFilter').value;
- const locale=$('#languageFilter').value;
- if((kind||locale)&&!globalPrintingsByCard){
-  $('#cardCount').textContent='跨語言卡面索引載入中…';
-  $('#cardGrid').innerHTML='<p class="note">正在讀取所有語言的印刷版本資料…</p>';
+ if(kind&&!twPrintingsByCard){
+  $('#cardCount').textContent='繁中版卡面索引載入中…';
+  $('#cardGrid').innerHTML='<p class="note">正在讀取繁中版印刷版本資料…</p>';
   $('#moreCards').hidden=true;
   return;
  }
- const matched=catalogueEditionRows();
  const mode=kind||'all';
- $('#cardCount').textContent=matched.length.toLocaleString('zh-TW')+(kind?' 款有圖片網址的卡面':' 張卡牌');
+ const matched=catalogueEditionRows();
+ $('#cardCount').textContent=matched.length.toLocaleString('zh-TW')+(kind?' 款卡面':' 張卡牌');
  $('#cardGrid').innerHTML=matched.slice(0,shownCards).map(({card:c,edition:v})=>{
-  const preview=catalogueTileArt(c,v,mode);if(!preview)return '';
-  const code=rarityCode(v?.rarity||c.rarity);
-  const kindLabel=kind?` · ${editionKindLabel(v.kind)}`:'';
-  const region=v?` · ${editionLocaleLabel(editionLocale(v.locale))}`:'';
-  const descriptor=kind?`${v.printId||c.id} · ${code}${kindLabel}${region}`:`${c.id} · ${code}${region}`;
-  return `<button class="cardtile" data-card="${safe(c.id)}" data-print-id="${safe(v?.printId||c.id)}" data-locale="${safe(v?.locale||'')}"><div class="coloredge" style="--edge:${cardColor(c)}"></div>${preview}<div class="cardmeta"><strong title="${safe(c.name)}">${safe(c.name)}</strong><small>${safe(descriptor)}</small></div></button>`;
- }).join('')||'<div class="note">找不到符合條件且有圖片網址的卡面。</div>';
+  const image=catalogueTileArt(c,v,mode);
+  if(!image)return '';
+  const editionInfo=kind?`${v.printId||c.id} · ${rarityCode(v.rarity||c.rarity)} · ${taiwanVersionKindLabel(v.kind)}`:`${c.id} · ${rarityCode(v?.rarity||c.rarity)}`;
+  return `<button class="cardtile" data-card="${safe(c.id)}" data-print-id="${safe(v?.printId||c.id)}"><div class="coloredge" style="--edge:${cardColor(c)}"></div>${image}<div class="cardmeta"><strong title="${safe(c.name)}">${safe(c.name)}</strong><small>${safe(editionInfo)}</small></div></button>`;
+ }).join('')||'<div class="note">找不到符合條件的卡面。</div>';
  $('#moreCards').hidden=matched.length<=shownCards;
 }
 // All card images across the PWA open this one read-only-by-default detail viewer.
@@ -334,7 +322,7 @@ function openCard(id){
  const effectBlock=`<div class="cardDetailEffect" id="cardDetailEffectPanel" data-detail-id="${safe(c.id)}"><strong>卡牌效果</strong><p>${effectText}</p>${triggerBlock}</div>`;
  const inEditor=currentPage==='cards'||currentPage==='builder';
  const action=known&&inEditor?`<button class="primary" data-cardact="${c.category==='Leader'?'leader':'add'}" data-id="${safe(c.id)}">${c.category==='Leader'?'設為領航員':'加入目前牌組'}</button>`:'';
- $('#dialogBody').innerHTML=`<div class="dialogbody cardDetailLayout">${art(c)}<div class="cardDetailContent"><h2>${safe(c.name||c.id)}</h2><div class="colorDots">${dots(c)}</div>${record}${details}${effectBlock}<div id="cardPrintingsPanel" data-card-id="${safe(c.id)}">正在讀取不同卡面版本…</div>${action}<p class="cardDetailFootnote">卡牌效果按需讀取自 <a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records 繁中資料</a>；美術、卡面及文字權利屬原權利人。若未授權使用請依來源規範處理。</p></div></div>`;
+ $('#dialogBody').innerHTML=`<div class="dialogbody cardDetailLayout">${art(c).replace('class="cardart"','class="cardart" id="cardDetailMainArt"')}<div class="cardDetailContent"><h2>${safe(c.name||c.id)}</h2><div class="colorDots">${dots(c)}</div>${record}${details}${effectBlock}<div id="cardPrintingsPanel" data-card-id="${safe(c.id)}">正在讀取不同卡面版本…</div>${action}<p class="cardDetailFootnote">卡牌效果按需讀取自 <a href="https://github.com/buhbbl/punk-records" target="_blank" rel="noopener noreferrer">Punk Records 繁中資料</a>；美術、卡面及文字權利屬原權利人。若未授權使用請依來源規範處理。</p></div></div>`;
  const dlg=$('#cardDialog');if(!dlg.open)dlg.showModal();
  showCardPrintings(c.id);
  if(shouldLoad){
@@ -451,17 +439,18 @@ function validDeck(d){return d&&typeof d==='object'&&typeof d.leaderId==='string
 async function restoreDecks(file){if(!file)return;try{const data=JSON.parse(await file.text());if(!Array.isArray(data.decks)||!data.decks.every(validDeck))throw Error('不是本網站的合法牌組備份');if(!confirm(`將以備份中的 ${data.decks.length} 套牌組取代目前儲存的 ${decks.length} 套，確定嗎？`))return;decks=data.decks;await put('decks',decks);if(Array.isArray(data.community))localStorage.setItem('grand-community-notes',JSON.stringify(data.community.filter(x=>typeof x?.name==='string'&&/^https:\/\//.test(x.url||'')).slice(0,150)));if(Array.isArray(data.favorites))localStorage.setItem('grand-results-favorites',JSON.stringify(data.favorites.filter(x=>typeof x==='string').slice(0,300)));toast(`已還原 ${decks.length} 套牌組；收藏與社群候選需重新整理頁面顯示`);renderHome();}catch(e){toast('還原失敗：'+e.message);}finally{$('#importBackup').value='';}}
 function bindEvents(){
  $$('[data-page]').forEach(el=>el.addEventListener('click',()=>nav(el.dataset.page)));$$('[data-go]').forEach(el=>el.addEventListener('click',()=>nav(el.dataset.go)));
- ['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter','#languageFilter'].forEach(id=>{
+ ['#cardSearch','#colorFilter','#typeFilter','#setFilter','#rarityFilter','#printingKindFilter'].forEach(id=>{
   $(id).addEventListener(id==='#cardSearch'?'input':'change',()=>{
-   shownCards=72;renderCards();
-   if(!globalPrintingsByCard)fetchPrintingsOnce().then(()=>{
-    if(currentPage==='cards')renderCards();
-   }).catch(()=>{
-    if(currentPage==='cards'&&($('#printingKindFilter').value||$('#languageFilter').value)){
-     $('#cardCount').textContent='跨語言卡面索引暫時無法取得';
-     $('#cardGrid').innerHTML='<p class="note">版本來源目前無法讀取，可切換回全部卡牌查看既有卡庫。</p>';
-    }
-   });
+    shownCards=72;
+    renderCards();
+    if(!twPrintingsByCard)fetchPrintingsOnce().then(()=>{
+      if(currentPage==='cards')renderCards();
+    }).catch(()=>{
+      if($('#printingKindFilter').value&&currentPage==='cards'){
+        $('#cardCount').textContent='繁中版卡面索引載入失敗';
+        $('#cardGrid').innerHTML='<p class="note">無法取得繁中版版本資料；保留全部卡牌檢視功能。</p>';
+      }
+    });
   });
  });
  $('#moreCards').addEventListener('click',()=>{shownCards+=72;renderCards();});

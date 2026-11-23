@@ -1,5 +1,5 @@
 /* v9: network-first for JSON, cache-first shell fallback. Never serve HTML to JSON requests. */
-const CACHE='grand-decks-shell-v13-5-multilingual-printings-1';
+const CACHE='grand-decks-shell-v13-6-preview-artwork-1';
 const SHELL=['./','./index.html','./style.css','./app.js','./results.js','./version-history.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 const DATA=['./data/decks.json','./data/cards.json','./data/sync-status.json','./data/meta.json','./data/integrity.json','./data/rules.json','./data/topdecks-sets.json','./data/community.json'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
