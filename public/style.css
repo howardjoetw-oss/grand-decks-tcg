@@ -126,3 +126,7 @@
 .printingPreview strong,.printingPreview small{display:block;overflow-wrap:anywhere;margin-top:5px}
 .printingPreview[aria-pressed="true"]{outline:2px solid var(--gold);outline-offset:-2px;background:#27364e}
 .printingPreview:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+
+/* v13.7: empty-image message remains visible when all origins fail. */
+.editionImageNotice{grid-column:1/-1;display:block;padding:18px;border:1px dashed var(--line);border-radius:10px;background:var(--panel)}
+.editionImageNotice[hidden]{display:none}
