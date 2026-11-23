@@ -10,6 +10,22 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./style.css?v=13.9">
   <title>GRAND DECKS｜航海王卡牌戰術室 · 全球賽事牌組</title>
+<style>
+
+/* GRAND DECKS v14 leader preview (embedded in index.html for one-file upload) */
+#deckLabLeaderPreviewHotfix{display:grid;grid-template-columns:minmax(85px,116px) minmax(0,1fr);gap:14px;align-items:center;margin:12px 0 10px;padding:12px;border:1px solid #485b74;border-radius:11px;background:#142238;min-width:0}
+#deckLabLeaderPreviewHotfix .leaderPreviewPicture{display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:5/7;border:1px solid #677996;border-radius:8px;overflow:hidden;background:linear-gradient(155deg,#273d56,#0c1423);padding:0;color:#d6bf90;cursor:pointer;position:relative}
+#deckLabLeaderPreviewHotfix img{display:none;width:100%;height:100%;object-fit:contain}
+#deckLabLeaderPreviewHotfix img.loaded{display:block}
+#deckLabLeaderPreviewHotfix .leaderPreviewPlaceholder{padding:7px;text-align:center;overflow-wrap:anywhere;font-size:11px;line-height:1.4}
+#deckLabLeaderPreviewHotfix .leaderPreviewInfo{min-width:0;display:flex;flex-direction:column;gap:6px}
+#deckLabLeaderPreviewHotfix strong{font-size:15px;line-height:1.5;color:#f6e4bf;overflow-wrap:anywhere}
+#deckLabLeaderPreviewHotfix small{font-size:12px;line-height:1.4;color:#b9cce1;overflow-wrap:anywhere}
+#deckLabLeaderPreviewHotfix .leaderPreviewStatus{font-size:11px;color:#dbbc7a;line-height:1.5;overflow-wrap:anywhere}
+#deckLabLeaderPreviewHotfix .leaderPreviewHelp{font-size:11px;color:#adbacd;line-height:1.45}
+@media(max-width:390px){#deckLabLeaderPreviewHotfix{grid-template-columns:minmax(75px,95px) minmax(0,1fr);gap:10px;padding:9px}#deckLabLeaderPreviewHotfix strong{font-size:13px}}
+
+</style>
 </head>
 <body>
   <div class="app">
@@ -79,5 +95,101 @@
   <script src="./app.js?v=13.9" defer></script>
   <script src="./results.js?v=13.9" defer></script>
   <script src="./deck-builder-v14.js?v=14.0" defer></script>
+  <script id="deck-leader-preview-fix">
+(function () {
+  'use strict';
+  // Run after all existing defer scripts. Keep the original PWA, deck and artwork code untouched.
+  document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('deckLabLeaderPreviewHotfix')) return;
+    const right = document.getElementById('deckLabDeckPanel');
+    const originalButton = document.getElementById('deckLabLeaderArt');
+    if (!right || !originalButton || typeof renderBuilder !== 'function') return;
+    const panel = document.createElement('div');
+    panel.id = 'deckLabLeaderPreviewHotfix';
+    panel.setAttribute('aria-label', '目前領航員卡面');
+    panel.innerHTML = '<button type="button" class="leaderPreviewPicture" aria-label="點選更換領航員卡面"><span class="leaderPreviewPlaceholder">LEADER</span></button>' +
+      '<div class="leaderPreviewInfo"><strong class="leaderPreviewName">尚未選擇領航員</strong><small class="leaderPreviewId"></small><span class="leaderPreviewStatus"></span><span class="leaderPreviewHelp">點選圖片即可切換卡面版本</span></div>';
+    right.insertBefore(panel, originalButton);
+    panel.querySelector('button').addEventListener('click', () => originalButton.click());
+    const attempted = new Set();
+    function refreshLeaderPreview(force = false) {
+      const id = String(currentDeck?.leaderId || '').trim().toUpperCase();
+      const artId = String(currentDeck?.artworks?.[id] || '');
+      const hasIndex = typeof twPrintingsByCard !== 'undefined' && !!twPrintingsByCard;
+      const key = id + '|' + artId + '|' + (hasIndex ? 1 : 0);
+      if (!force && key === panel.dataset.previewKey) return;
+      panel.dataset.previewKey = key;
+      const frame = panel.querySelector('.leaderPreviewPicture');
+      const name = panel.querySelector('.leaderPreviewName');
+      const cardNo = panel.querySelector('.leaderPreviewId');
+      const status = panel.querySelector('.leaderPreviewStatus');
+      frame.replaceChildren();
+      const placeholder = document.createElement('span');
+      placeholder.className = 'leaderPreviewPlaceholder';
+      frame.appendChild(placeholder);
+      if (!id) {
+        name.textContent = '尚未選擇領航員'; cardNo.textContent = '';
+        placeholder.textContent = 'LEADER'; status.textContent = '請先選擇領航員卡牌'; return;
+      }
+      const card = typeof byId === 'function' ? byId(id) : null;
+      name.textContent = card?.name || '領航員資料未收錄';
+      cardNo.textContent = id;
+      frame.setAttribute('aria-label', '更換 ' + (card?.name || id) + ' 的卡面');
+      const edition = artId && typeof allArtworkVersions === 'function'
+        ? allArtworkVersions(id).find(v => v.printId === artId) : null;
+      if (artId && !edition) {
+        placeholder.textContent = '讀取所選卡面…';
+        status.textContent = hasIndex ? '未找到所選印刷版本，可重新選擇' : '載入印刷版本索引中…';
+        const requestKey = id + '|' + artId;
+        if (!hasIndex && !attempted.has(requestKey) && typeof fetchPrintingsOnce === 'function') {
+          attempted.add(requestKey);
+          fetchPrintingsOnce().then(() => refreshLeaderPreview(true)).catch(() => {
+            if (panel.dataset.previewKey === key) {
+              placeholder.textContent = '版本載入失敗';
+              status.textContent = '目前無法取得版本卡圖，請稍後重選';
+            }
+          });
+        }
+        return;
+      }
+      // A chosen alternate printing must never silently fall back to an unrelated base image.
+      const urls = edition?.sources || (card && typeof cardImageCandidates === 'function' ? cardImageCandidates(card) : []);
+      const sources = [...new Set((urls || []).filter(url => typeof url === 'string' && /^https:\/\//i.test(url)))];
+      status.textContent = edition ? '目前卡面：' + edition.printId : '預設卡面（日文優先）';
+      if (!sources.length) {
+        placeholder.textContent = '沒有圖片來源';
+        status.textContent = '此領航員目前沒有可用卡圖'; return;
+      }
+      const img = document.createElement('img');
+      img.alt = (card?.name || id) + ' ' + id + ' 領航員卡面';
+      img.loading = 'eager'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
+      frame.appendChild(img);
+      placeholder.textContent = '載入圖片中…';
+      let at = 0;
+      img.onload = () => {
+        if (panel.dataset.previewKey !== key || !img.isConnected) return;
+        if (img.naturalWidth > 0) { img.classList.add('loaded'); placeholder.hidden = true; }
+      };
+      img.onerror = () => {
+        if (panel.dataset.previewKey !== key || !img.isConnected) return;
+        at++;
+        if (at < sources.length) { img.src = sources[at]; return; }
+        img.remove(); placeholder.hidden = false;
+        placeholder.textContent = '圖片無法載入';
+        status.textContent = edition ? '所選版本圖片無法載入，請更換卡面' : '官方卡圖目前無法載入，請稍後重試';
+      };
+      img.src = sources[0];
+    }
+    // Repaint when selecting a Leader, loading a deck, choosing a print or switching tabs.
+    const previousRender = renderBuilder;
+    renderBuilder = function (...args) {
+      const output = previousRender.apply(this, args);
+      refreshLeaderPreview();
+      return output;
+    };
+    refreshLeaderPreview();
+  });
+})();
+  </script>
 </body>
 </html>
