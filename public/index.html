@@ -26,6 +26,93 @@
 @media(max-width:390px){#deckLabLeaderPreviewHotfix{grid-template-columns:minmax(75px,95px) minmax(0,1fr);gap:10px;padding:9px}#deckLabLeaderPreviewHotfix strong{font-size:13px}}
 
 </style>
+<style id="grand-decks-arena-css">
+/* GRAND DECKS v14.1 + v15.0/15.1: extra panels, original theme preserved */
+#v14MetaLab{margin-top:22px}
+.v14MetaMetrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.v14MetaMetrics>div{background:#172740;border:1px solid #34465d;border-radius:9px;padding:12px;display:grid;gap:4px}
+.v14MetaMetrics b{font-size:22px;color:var(--gold)}.v14MetaMetrics small{font-size:11px;color:var(--sub)}
+.v14MetaCards{display:grid;gap:5px;margin-top:14px}.v14MetaCard{display:grid;grid-template-columns:minmax(92px,2fr) minmax(60px,1fr) 52px 75px 57px;gap:8px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line);font-size:12px}
+.v14MetaCardTitle{min-width:0;display:grid;gap:3px}.v14MetaCardTitle b{font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v14MetaCardTitle small{color:var(--sub)}
+.v14MetaMeter{height:7px;border-radius:12px;background:#34415a;overflow:hidden}.v14MetaMeter i{display:block;height:100%;background:var(--gold);border-radius:12px}.v14MetaCard strong{color:var(--gold);text-align:right}.v14MetaCard>small{color:var(--sub);font-size:10px}
+#page-arena .arenaWarning{background:#2c251b;border:1px solid #796041;color:#ead4aa;border-radius:9px;padding:12px 15px;font-size:12px;line-height:1.7;margin:0 0 16px}
+#page-arena .arenaForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+#page-arena .arenaForm label{display:grid;gap:6px;font-size:12px;color:var(--sub)}
+#page-arena .arenaToolbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin:16px 0}
+#page-arena .arenaToolbar>strong{font-size:15px;color:var(--gold)}
+#page-arena .arenaToolButtons{display:flex;flex-wrap:wrap;gap:5px}
+#page-arena .arenaMsg{border:1px solid #435777;background:#15253a;padding:10px 13px;border-radius:9px;margin:10px 0;font-size:12px;line-height:1.6}
+#page-arena .arenaPlayer{border:1px solid #374962;border-radius:12px;padding:16px;background:var(--panel);margin:13px 0}
+#page-arena .arenaActiveSide{border-color:#a18b62}
+#page-arena .arenaPlayer h3{display:flex;gap:8px;align-items:center;font-size:15px;margin:0 0 12px;line-height:1.4}
+#page-arena .arenaPlayer h4{font-size:12px;color:var(--sub);font-weight:650;margin:17px 0 8px}
+#page-arena .arenaActivePill{font-size:10px;background:#68512d;border:1px solid #a88f61;color:#ffdda3;border-radius:20px;padding:2px 8px;white-space:nowrap}
+#page-arena .arenaLeader{display:flex;align-items:flex-start;gap:14px;border:1px solid #40536a;border-radius:10px;padding:11px;background:#0e1b2e}
+#page-arena .arenaLeader>.arenaArt{width:100px;max-width:28%;flex:none}
+#page-arena .arenaLeaderDetails{min-width:0;flex:1;display:grid;gap:6px}
+#page-arena .arenaLeaderDetails strong{font-size:16px;overflow-wrap:anywhere}
+#page-arena .arenaLeaderDetails>small{font-size:12px;color:var(--sub)}
+#page-arena .arenaArt{position:relative;display:flex;align-items:center;justify-content:center;flex:none;width:55px;aspect-ratio:5/7;background:linear-gradient(130deg,#283750,#101b2b);border:1px solid #4a5a73;border-radius:6px;overflow:hidden}
+#page-arena .arenaArt img{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+#page-arena .arenaArtFallback{font-size:10px;text-align:center;word-break:break-all;color:#e1c582;padding:4px}
+#page-arena .arenaBadges{display:flex;flex-wrap:wrap;gap:5px}
+#page-arena .arenaBadges>span{border:1px solid #3c536d;padding:3px 7px;border-radius:5px;font-size:11px;color:#b9cce1}
+#page-arena .arenaCardActions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:5px}
+#page-arena .arenaCardActions button{padding:5px 8px;min-height:32px;font-size:11px}
+#page-arena .arenaBoard{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px}
+#page-arena .arenaUnit{display:flex;gap:9px;align-items:flex-start;padding:9px;background:#14243b;border:1px solid #334962;border-radius:8px;min-width:0}
+#page-arena .arenaUnitText{display:grid;gap:5px;min-width:0;align-self:center}
+#page-arena .arenaUnitText strong{font-size:12px;overflow-wrap:anywhere}
+#page-arena .arenaUnitText small,#page-arena .arenaUnitText span{font-size:11px;color:var(--sub)}
+#page-arena .arenaHand{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:8px}
+#page-arena .arenaHandCard{display:flex;gap:7px;padding:8px;background:#162741;border:1px solid #344b65;border-radius:8px;min-width:0}
+#page-arena .arenaHandCard>div{display:grid;align-content:center;gap:5px;min-width:0}
+#page-arena .arenaHandCard strong{font-size:11px;overflow-wrap:anywhere}
+#page-arena .arenaHandCard small{color:var(--sub);font-size:10px}
+#page-arena .arenaHandCard button{padding:5px 6px;font-size:11px;line-height:1.3;min-height:31px}
+#page-arena .arenaHiddenHand{font-size:12px;padding:16px;background:#14243b;border:1px dashed #456079;border-radius:8px;color:#9db2c9;text-align:center}
+#page-arena .arenaCallout{padding:14px;margin:13px 0;border:1px solid #a78d56;border-radius:10px;background:#3a302399;font-size:13px;display:grid;gap:10px}
+#page-arena .arenaTargetChoices,#page-arena .arenaCounters{display:flex;flex-wrap:wrap;gap:7px}
+#page-arena .arenaEndBar{display:flex;gap:9px;flex-wrap:wrap;margin:13px 0 18px}
+#page-arena .arenaLog{font-size:12px;color:var(--sub);border-top:1px solid var(--line);padding-top:12px}
+#page-arena .arenaLog summary{cursor:pointer;color:var(--gold)}
+#page-arena .arenaLog p{border-bottom:1px solid #293a50;padding:7px 0;margin:0}
+#page-arena [hidden]{display:none!important}
+@media(max-width:760px){.bottomnav:has([data-page="arena"]){grid-template-columns:repeat(7,minmax(0,1fr))}.bottomnav [data-page="arena"]{min-width:0}.bottomnav:has([data-page="arena"]) button{font-size:20px;padding:0}.bottomnav:has([data-page="arena"]) button span{font-size:9px}#page-arena .arenaForm{grid-template-columns:1fr 1fr}#page-arena .arenaBoard{grid-template-columns:repeat(2,minmax(0,1fr))}#page-arena .arenaHand{grid-template-columns:repeat(2,minmax(0,1fr))}#page-arena .arenaUnit,#page-arena .arenaHandCard{gap:5px;padding:6px}#page-arena .arenaUnit>.arenaArt,#page-arena .arenaHandCard>.arenaArt{width:42px}#page-arena .arenaUnitText strong{font-size:11px}.v14MetaCard{grid-template-columns:minmax(92px,2fr) minmax(40px,1fr) 48px 64px;gap:4px}.v14MetaCard>small:last-child{display:none}}
+@media(max-width:385px){#page-arena .arenaForm{grid-template-columns:1fr}#page-arena .arenaBoard,#page-arena .arenaHand{grid-template-columns:1fr}#page-arena .arenaLeader>.arenaArt{width:78px}#page-arena .arenaToolbar>strong{font-size:13px}}
+
+/* v14.2-v14.3: evidence-based matchup stats & personal diary */
+#gdMatchStats{margin-top:18px}
+#gdMatchStats .gdFilters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin:12px 0 16px}
+#gdMatchStats .gdFilters label{font-size:12px;color:var(--sub);display:grid;gap:6px;min-width:0}
+#gdMatchStats input,#gdMatchStats select,#gdMatchStats textarea{width:100%;max-width:100%;min-width:0}
+#gdMatchStats .gdWide{grid-column:1/-1}
+#gdMatchStats h4{font-size:14px;color:var(--gold);margin:16px 0 8px}
+#gdMatchStats .gdStatsSummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:16px 0}
+#gdMatchStats .gdStatsSummary span{border:1px solid #34455e;background:#19273d;border-radius:9px;display:grid;gap:3px;padding:10px;font-size:10px;color:var(--sub)}
+#gdMatchStats .gdStatsSummary b{color:var(--gold);font-size:20px}
+#gdMatchStats details{margin:16px 0;border-top:1px solid var(--line);padding-top:11px}
+#gdMatchStats details summary{cursor:pointer;color:var(--gold);font-weight:600;font-size:13px}
+#gdMatchStats .gdMatchupRows{display:grid;gap:4px}
+#gdMatchStats .gdMatchupRow{display:grid;grid-template-columns:minmax(86px,2fr) 88px 110px 65px 80px;gap:7px;align-items:center;border-bottom:1px solid #34455e;padding:9px 0;font-size:11px}
+#gdMatchStats .gdMatchupRow b{overflow-wrap:anywhere;font-weight:700}#gdMatchStats .gdMatchupRow small{font-size:10px;color:var(--sub)}
+#gdMatchStats .gdMatchupRow strong{color:var(--gold)}
+#gdMatchStats .gdTwoCols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#gdMatchStats .gdTwoCols>div{background:#19273d;border:1px solid #34455e;border-radius:10px;padding:12px;min-width:0}
+#gdMatchStats .gdTwoCols p{margin:6px 0;font-size:12px}
+#gdMatchStats .gdPersonalLine{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-bottom:1px solid #33465b;font-size:11px}
+#gdMatchStats .gdPersonalLine span{min-width:0;overflow-wrap:anywhere}
+#gdMatchStats .gdPersonalLine small{display:block;color:var(--muted)}
+#gdMatchStats .gdPersonalLine button{border:1px solid #7b4b4b;border-radius:5px;padding:6px 8px;background:#352329;color:#f3bbbb;font-size:11px}
+#gdMatchStats .gdTurnCurve{display:grid;gap:6px;margin:10px 0}
+#gdMatchStats .gdTurnCurve>div{display:grid;grid-template-columns:72px minmax(0,1fr) 120px;align-items:center;gap:8px;font-size:11px}
+#gdMatchStats .gdCurveTrack{height:9px;background:#34465e;border-radius:9px;overflow:hidden}
+#gdMatchStats .gdCurveTrack i{display:block;height:100%;background:#d7b977}
+#gdMatchStats #gdMatchNotice{padding:12px 2px;min-height:24px}
+@media(max-width:760px){#gdMatchStats .gdMatchupRow{grid-template-columns:minmax(90px,1.6fr) 74px 64px;gap:5px}#gdMatchStats .gdMatchupRow small:nth-of-type(1),#gdMatchStats .gdMatchupRow small:nth-of-type(2){display:none}#gdMatchStats .gdStatsSummary b{font-size:16px}#gdMatchStats .gdTurnCurve>div{grid-template-columns:56px minmax(0,1fr) 97px;gap:6px}}
+@media(max-width:390px){#gdMatchStats .gdFilters,#gdMatchStats .gdTwoCols{grid-template-columns:1fr}#gdMatchStats .gdMatchupRow{grid-template-columns:minmax(70px,1.5fr) 76px 62px}}
+
+</style>
 </head>
 <body>
   <div class="app">
@@ -191,5 +278,606 @@
   });
 })();
   </script>
+<script id="v14-meta-research">
+/* v14.1 Meta research panel: valid top-cut decklists only, NOT match win rates. */
+(function () {
+  'use strict';
+  const $=q=>document.querySelector(q);
+  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const allRegions={JP:'JP',TW:'TW',IT:'EU',FR:'EU',ES:'EU',GB:'EU',DE:'EU',US:'NA',CA:'NA',KR:'ASIA',SG:'ASIA',MY:'ASIA',HK:'ASIA'};
+  let rows=null,loadError='',selected='';
+  const valid=r=>r&&r.sourceType!=='community_claim'&&/^https:\/\//.test(String(r.sourceUrl||''))&&r.leaderId&&r.cards&&typeof r.cards==='object'&&Object.values(r.cards).every(n=>Number.isInteger(n)&&n>0&&n<=4)&&Object.values(r.cards).reduce((n,x)=>n+x,0)===50;
+  function filtered(){
+    if(!rows)return[];
+    const dateLimit=Number($('#metaWindow')?.value||0),r=$('#metaRegion')?.value||'ALL',now=Date.now();
+    return rows.filter(x=>{
+      if(r!=='ALL' && (x.country!==r&&(allRegions[String(x.country||'').toUpperCase()]||'OTHER')!==r))return false;
+      if(dateLimit){const d=Date.parse(String(x.date||'')+'T00:00:00Z');if(!Number.isFinite(d)||now-d<0||now-d>=dateLimit*864e5)return false;}
+      return true;
+    });
+  }
+  function compute(data,leader){
+    const sample=data.filter(r=>r.leaderId===leader);
+    const count=sample.length,stats=new Map();
+    for(const d of sample){for(const [id,n] of Object.entries(d.cards)){const t=stats.get(id)||{id,decks:0,total:0};t.decks++;t.total+=n;stats.set(id,t);}}
+    const cards=[...stats.values()].map(r=>({...r,rate:count?100*r.decks/count:0,avg:r.decks?r.total/r.decks:0})).sort((a,b)=>b.rate-a.rate||b.avg-a.avg||a.id.localeCompare(b.id));
+    return {sample:count,cards,events:new Set(sample.map(x=>x.event+'|'+x.date+'|'+x.country)).size};
+  }
+  function render(){
+    const box=$('#v14MetaLabBody'),chooser=$('#v14MetaLeader');if(!box||!chooser)return;
+    if(loadError){box.textContent='資料讀取失敗：'+loadError;return;}
+    if(!rows){box.textContent='尚未讀取賽事牌組資料';return;}
+    const data=filtered(),byLeader=new Map();for(const d of data)byLeader.set(d.leaderId,(byLeader.get(d.leaderId)||0)+1);
+    const current=chooser.value;
+    chooser.innerHTML=[...byLeader].sort((a,b)=>b[1]-a[1]).map(([id,n])=>`<option value="${esc(id)}">${esc(window.grandCardInfo?.(id)?.name||id)} · ${n} 副</option>`).join('');
+    if(byLeader.has(current))chooser.value=current;else if(byLeader.has(selected))chooser.value=selected;
+    selected=chooser.value;const record=compute(data,selected);
+    if(!record.sample){box.innerHTML='<p class="note">此篩選條件沒有完整 50 張的公開賽事牌組，請調整時間或地區。</p>';return;}
+    let ownCards={};
+    const comp=$('#v14MetaCompareDeck');
+    if(comp){
+      const before=comp.value,opts=[];
+      try{if(typeof currentDeck==='object'&&currentDeck.leaderId===selected)opts.push({id:'__draft__',name:'目前組牌草稿',items:currentDeck.items||{}});}catch{}
+      try{if(Array.isArray(decks))for(const d of decks)if(d.leaderId===selected)opts.push({id:String(d.id||''),name:d.name||d.leaderId,items:d.items||{}});}catch{}
+      comp.innerHTML='<option value="">不比較個人牌組</option>'+opts.map(d=>`<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('');
+      comp.value=opts.some(d=>d.id===before)?before:(opts.some(d=>d.id==='__draft__')?'__draft__':'');
+      ownCards=opts.find(d=>d.id===comp.value)?.items||{};
+    }
+    const warning=record.sample<10?'樣本少於 10 副，採用率波動可能很大。':'';
+    box.innerHTML=`<div class="v14MetaMetrics"><div><b>${record.sample}</b><small>完整牌組樣本</small></div><div><b>${record.events}</b><small>賽事／日期／地區組合</small></div><div><b>${data.length}</b><small>同條件全 Leader 牌組數</small></div></div>`+
+     `<p class="tiny">採用率 = 在這 ${record.sample} 副該 Leader 的完整牌組中，有放入某卡的比例；平均張數只在使用該卡的牌組中計算。${warning}</p>`+
+     `<div class="v14MetaCards">${record.cards.slice(0,36).map(c=>{
+       const name=window.grandCardInfo?.(c.id)?.name||c.id,own=Number(ownCards[c.id]||0);
+       return `<div class="v14MetaCard"><span class="v14MetaCardTitle"><b>${esc(name)}</b><small>${esc(c.id)}</small></span><div class="v14MetaMeter"><i style="width:${c.rate.toFixed(1)}%"></i></div><strong>${c.rate.toFixed(1)}%</strong><small>平均 ${c.avg.toFixed(1)} 張</small><small>${Object.keys(ownCards).length?('我的 '+own+' 張'+(own===0&&c.rate>=50?' · 常用未加入':'')):''}</small></div>`;
+     }).join('')}</div>`+
+     `<p class="tiny">本資料僅來源於 GRAND DECKS 收錄的公開賽事牌組，可能有收錄偏差。不同賽制與禁限卡日期可能混雜，這不是使用率母體，也不是對戰勝率。</p>`;
+  }
+  async function load(){
+    if(rows){render();return;}
+    const box=$('#v14MetaLabBody');if(box)box.textContent='正在讀取已收錄賽事資料…';
+    try{const res=await fetch('./data/decks.json',{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);const doc=await res.json();if(!Array.isArray(doc.decks))throw Error('牌組格式不正確');const seen=new Set();rows=doc.decks.filter(r=>valid(r)&&(!r.id||(!seen.has(r.id)&&seen.add(r.id))));render();}
+    catch(e){loadError=e.message||String(e);render();}
+  }
+  function mount(){
+    const host=$('#page-meta');if(!host||$('#v14MetaLab'))return;
+    const section=document.createElement('section');section.id='v14MetaLab';section.className='panel';section.innerHTML='<div class="panelheading"><strong>v14.1 · Leader 熱門構築研究</strong><span>已公開完整賽事牌組</span></div><label class="inputlabel" for="v14MetaLeader">選擇領航員</label><select id="v14MetaLeader"></select><label class="inputlabel" for="v14MetaCompareDeck" style="margin-top:9px">對照我的牌組（可選）</label><select id="v14MetaCompareDeck"></select><p class="tiny">與上方 Meta 共用時間及地區篩選；此處計算的是卡牌採用率，不會推測對戰勝率。</p><div id="v14MetaLabBody" class="note">切換到 Meta 頁面後讀取…</div>';
+    host.appendChild(section);
+    $('#v14MetaLeader').addEventListener('change',()=>{selected=$('#v14MetaLeader').value;render();});
+    $('#v14MetaCompareDeck')?.addEventListener('change',render);
+    ['metaWindow','metaRegion'].forEach(id=>$('#'+id)?.addEventListener('change',render));
+    document.querySelectorAll('[data-page="meta"],[data-go="meta"]').forEach(node=>node.addEventListener('click',load));
+    if(host.classList.contains('active'))load();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
+  if(typeof module==='object'&&module.exports)module.exports={compute,valid};
+})();
+
+</script>
+
+<script id="gd-match-stats-core">
+/* GRAND DECKS v14.2/v14.3 — standalone match data engine. No network calls.
+   Two separated pools: public pairings IMPORTED with source evidence (not independently
+   audited), and personally ENTERED results (self-reported, not tournament statistics).
+*/
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.GrandMatchStats=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
+ 'use strict';
+ const ID=/^[A-Z0-9]{1,10}-\d{2,4}$/i;
+ const dateOk=s=>/^\d{4}-\d{2}-\d{2}$/.test(String(s||''))&&!Number.isNaN(Date.parse(String(s)+'T00:00:00Z'));
+ const leader=v=>{const s=String(v||'').trim().toUpperCase();return ID.test(s)?s:'';};
+ const clean=(s,max=150)=>String(s||'').trim().slice(0,max);
+ const validResult=s=>['win','loss','tie'].includes(s);
+ function validatePersonal(raw){
+  const date=clean(raw?.date,10),my=leader(raw?.myLeader),opponent=leader(raw?.opponentLeader),result=clean(raw?.result,5);
+  if(!dateOk(date)||!my||!opponent||!validResult(result))throw Error('日期、雙方 Leader 或勝敗不正確');
+  const order=raw.first==='first'||raw.first==='second'?raw.first:'unknown';
+  const turns=raw.turns===''||raw.turns==null?null:Number(raw.turns);
+  if(turns!==null&&(!Number.isInteger(turns)||turns<1||turns>300))throw Error('回合數必須為 1–300 或留空');
+  const mulligan=raw.mulligan==='yes'?'yes':raw.mulligan==='no'?'no':'unknown';
+  // Optional exactly observed number of cards played on own turns 1..6.
+  const turnPlays={};const src=String(raw.turnPlays||'').trim();
+  if(src){for(const part of src.split(/[,，;；]+/)){
+   const m=part.trim().match(/^([1-6])\s*[:：=]\s*(\d{1,2})$/);
+   if(!m||Number(m[2])>20||turnPlays[m[1]]!==undefined)throw Error('前六回合出牌記錄格式：1:1,2:2（每回合最多 20 張）');
+   turnPlays[m[1]]=Number(m[2]);
+  }}
+  const region=['JP','TW','EN','OTHER'].includes(raw.region)?raw.region:'OTHER';
+  const format=['standard','extended','unknown'].includes(raw.format)?raw.format:'unknown';
+  return {id:clean(raw.id,100)||('personal-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)),date,myLeader:my,opponentLeader:opponent,result,first:order,mulligan,turns,turnPlays:src?Object.entries(turnPlays).map(([k,v])=>k+':'+v).join(','):'',region,format,notes:clean(raw.notes,600),source:'personal',evidence:'本人手動紀錄（未獨立驗證）'};
+ }
+ function extractLeader(row){
+  // A player may have leaderId/leader on their standing or inside game-specific decklist.
+  const d=row?.decklist||row?.deck||{};
+  const probes=[row?.leaderId,row?.leader,row?.leader_id,d?.leaderId,d?.leader_id,d?.leader,d?.leaderCard,d?.leader_card];
+  for(const v of probes){const t=typeof v==='object'?(v?.id||v?.card_id||v?.cardId):v;if(leader(t))return leader(t);}
+  return '';
+ }
+ function importLimitless({standings,pairings,tournamentId,date,region='OTHER',format='unknown',sourceUrl}){
+  if(!Array.isArray(standings)||!Array.isArray(pairings))throw Error('請提供 Limitless standings 與 pairings 陣列');
+  const t=clean(tournamentId,100),dt=clean(date,10),url=clean(sourceUrl,500);
+  if(!/^[a-z0-9-]{6,100}$/i.test(t)||!dateOk(dt)||!/^https:\/\/play\.limitlesstcg\.com\/tournament\/[a-z0-9-]+(?:\/.*)?$/i.test(url))throw Error('賽事 ID、日期或 Limitless 賽事網址不合法');
+  const players=new Map();let missing=0,duplicate=0;
+  for(const row of standings){const p=clean(row?.player,100),id=extractLeader(row);if(p&&id){if(players.has(p))duplicate++;players.set(p,id);}}
+  const matchups=[],ids=new Set();
+  for(const row of pairings){const p1=clean(row?.player1,100),p2=clean(row?.player2,100),winner=clean(row?.winner,100),a=players.get(p1),b=players.get(p2);
+   // No bye, double loss, draw/unknown, missing Leader mapping or invalid result.
+   if(!p1||!p2||p1===p2||!a||!b||![p1,p2].includes(winner)){missing++;continue;}
+   const phase=Number(row.phase),round=Number(row.round);
+   if(!Number.isInteger(round)||round<1||!Number.isInteger(phase)||phase<1){missing++;continue;}
+   const key=[t,phase,round,...[p1,p2].sort()].join('|');if(ids.has(key)){duplicate++;continue;}ids.add(key);
+   matchups.push({id:key,date:dt,leaderA:a,leaderB:b,winner:winner===p1?'A':'B',region:['JP','TW','EN','EU','NA','ASIA','OTHER'].includes(region)?region:'OTHER',format:clean(format,40),sourceUrl:url,source:'limitless-import',eventId:t,matchUnit:'match',evidence:'從匯入的 Limitless standings + pairings 配對（使用者提供，未獨立核實）'});
+  }
+  return {records:matchups,stats:{total:pairings.length,accepted:matchups.length,skipped:missing,duplicates:duplicate,playersMapped:players.size}};
+ }
+ function validatePublic(raw){
+  if(!raw||raw.source!=='limitless-import'||!raw.eventId||!leader(raw.leaderA)||!leader(raw.leaderB)||!['A','B'].includes(raw.winner)||!dateOk(raw.date))return null;
+  if(!/^https:\/\/play\.limitlesstcg\.com\/tournament\//.test(String(raw.sourceUrl)))return null;
+  return {...raw,id:clean(raw.id,160),leaderA:leader(raw.leaderA),leaderB:leader(raw.leaderB)};
+ }
+ function matchups(records,focus,opponent='',days=0,region='ALL',format='ALL',now=new Date()){
+  const f=leader(focus),o=leader(opponent),cutoff=new Date(now).getTime()-days*864e5;
+  const relevant=(records||[]).map(validatePublic).filter(Boolean).filter(x=>
+   (x.leaderA===f||x.leaderB===f)&&(!o||x.leaderA===o||x.leaderB===o)&&
+   (!days||(Date.parse(x.date+'T00:00:00Z')>=cutoff&&Date.parse(x.date+'T00:00:00Z')<=+new Date(now)))&&
+   (region==='ALL'||x.region===region)&&(format==='ALL'||x.format===format));
+  const totals=new Map();for(const x of relevant){const versus=x.leaderA===f?x.leaderB:x.leaderA;const p=totals.get(versus)||{opponent:versus,wins:0,losses:0,matches:0};p.matches++;if((x.winner==='A'&&x.leaderA===f)||(x.winner==='B'&&x.leaderB===f))p.wins++;else p.losses++;totals.set(versus,p);}
+  return [...totals.values()].map(x=>({...x,winRate:x.matches?100*x.wins/x.matches:0})).sort((a,b)=>b.matches-a.matches||a.opponent.localeCompare(b.opponent));
+ }
+ function personalSummary(rows,{myLeader='',days=0,region='ALL',now=new Date()}={}){
+  const cutoff=+new Date(now)-days*864e5,leaderFilter=leader(myLeader);let input=[];
+  for(const x of rows||[]){try{const v=validatePersonal(x);if((!leaderFilter||v.myLeader===leaderFilter)&&(region==='ALL'||v.region===region)&&(!days||Date.parse(v.date+'T00:00:00Z')>=cutoff)&&Date.parse(v.date+'T00:00:00Z')<=+new Date(now))input.push(v);}catch{}}
+  const counts={win:0,loss:0,tie:0},orders={first:{win:0,loss:0,tie:0},second:{win:0,loss:0,tie:0},unknown:{win:0,loss:0,tie:0}},mulligans={yes:{win:0,loss:0,tie:0},no:{win:0,loss:0,tie:0},unknown:{win:0,loss:0,tie:0}};
+  const verses=new Map();let turnsSum=0,turnsN=0;const curve=Array.from({length:6},(_,i)=>({turn:i+1,sum:0,observed:0,average:null}));
+  for(const x of input){counts[x.result]++;orders[x.first][x.result]++;mulligans[x.mulligan][x.result]++;if(x.turns!=null){turnsSum+=x.turns;turnsN++;}for(const part of x.turnPlays.split(',')){const m=part.match(/^([1-6]):(\d{1,2})$/);if(m){const idx=Number(m[1])-1;curve[idx].sum+=Number(m[2]);curve[idx].observed++;}}
+   const v=verses.get(x.opponentLeader)||{opponent:x.opponentLeader,wins:0,losses:0,ties:0,n:0};v.n++;v[x.result==='win'?'wins':x.result==='loss'?'losses':'ties']++;verses.set(x.opponentLeader,v);}
+  for(const item of curve)if(item.observed)item.average=item.sum/item.observed;const decisive=counts.win+counts.loss;
+  return {n:input.length,counts,winRate:decisive?100*counts.win/decisive:null,orders,mulligans,avgTurns:turnsN?turnsSum/turnsN:null,curve,versus:[...verses.values()].sort((a,b)=>b.n-a.n),excludedTiesFromWinRate:counts.tie};
+ }
+ return {validatePersonal,extractLeader,importLimitless,validatePublic,matchups,personalSummary};
+});
+
+</script>
+<script id="gd-match-stats-ui">
+/* v14.2 Matchup evidence, v14.3 personal match diary. Never mixes personal or practice with event-derived matches. */
+(function(){
+ 'use strict';
+ const M=window.GrandMatchStats;if(!M)return;
+ const $=q=>document.querySelector(q),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+ const PUBLIC_KEY='grand-decks-limitless-matches-v14-2';
+ const PERSONAL_KEY='grand-decks-my-matches-v14-3';
+ const load=(key)=>{try{const v=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(v)?v:[];}catch{return [];}};
+ let publicRows=load(PUBLIC_KEY).map(M.validatePublic).filter(Boolean),personalRows=load(PERSONAL_KEY).flatMap(r=>{try{return [M.validatePersonal(r)];}catch{return [];}});
+ const save=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));return true;}catch{notice('本機儲存空間不足，匯入並未成功儲存');return false;}};
+ const name=id=>window.grandCardInfo?.(id)?.name||id;
+ function download(file,content){const blob=new Blob([JSON.stringify(content,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=file;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);}
+ const today=()=>{const d=new Date(),offset=d.getTimezoneOffset()*60e3;return new Date(d.getTime()-offset).toISOString().slice(0,10);};
+ const notice=t=>{const el=$('#gdMatchNotice');if(el)el.textContent=t;};
+ const input=(id)=>$('#'+id)?.value||'';
+ function renderMatchups(){
+  const box=$('#gdMatchupSummary');if(!box)return;
+  const f=input('gdMatchLeader').trim().toUpperCase(),o=input('gdMatchOpponent').trim().toUpperCase(),days=Number(input('gdMatchDays')||0),reg=input('gdMatchRegion')||'ALL';
+  let result=[];if(/^[A-Z0-9]{1,10}-\d{2,4}$/.test(f))result=M.matchups(publicRows,f,o,days,reg,'ALL');
+  const total=result.reduce((n,x)=>n+x.matches,0);
+  box.innerHTML=`<div class="gdStatsSummary"><span><b>${publicRows.length}</b> 已匯入配對</span><span><b>${total}</b> 符合條件場次</span><span><b>${result.length}</b> 對手種類</span></div>`+
+   `<p class="tiny">資料來源：使用者匯入的 Limitless 配對結果（未獨立核實）。統計單位為「場 match」，BO3 不等於逐局 game；未配對 Leader、輪空、和局及雙敗均不計入。樣本少於 20 場不適合判斷優勢。</p>`+
+   (result.length?`<div class="gdMatchupRows">${result.slice(0,60).map(x=>`<div class="gdMatchupRow"><b>${esc(name(x.opponent))}</b><small>${esc(x.opponent)}</small><span>${x.wins} 勝 / ${x.losses} 敗</span><strong>${x.winRate.toFixed(1)}%</strong><small>${x.matches} 場${x.matches<20?' · 小樣本':''}</small></div>`).join('')}</div>`:'<p class="note">目前沒有可計算的正式配對資料。可匯入公開賽事的 standings + pairings 兩份 JSON；不會把原本前八佔比當作對戰勝率。</p>');
+ }
+ function renderPersonal(){
+  const box=$('#gdPersonalSummary');if(!box)return;
+  const opts={myLeader:input('gdMyLeader'),days:Number(input('gdMyDays')||0),region:input('gdMyRegion')||'ALL'};
+  const s=M.personalSummary(personalRows,opts);
+  const fmt=(r)=>{const n=r.win+r.loss;return `${r.win}勝 ${r.loss}敗 ${r.tie}和 · ${n?(100*r.win/n).toFixed(1)+'%':'—'}`;};
+  box.innerHTML=`<div class="gdStatsSummary"><span><b>${s.n}</b> 個人紀錄</span><span><b>${s.winRate===null?'—':s.winRate.toFixed(1)+'%'}</b> 決勝場勝率</span><span><b>${s.avgTurns===null?'—':s.avgTurns.toFixed(1)}</b> 平均回合（有紀錄者）</span></div>`+
+   `<p class="tiny">${s.counts.win} 勝／${s.counts.loss} 敗／${s.counts.tie} 和；勝率分母不含和局。這是自填私人紀錄，不能稱為全服 Meta 勝率。</p>`+
+   `<div class="gdTwoCols"><div><h4>先後手表現</h4><p>先手：${fmt(s.orders.first)}</p><p>後手：${fmt(s.orders.second)}</p><p>未記錄：${fmt(s.orders.unknown)}</p></div><div><h4>換手表現</h4><p>有換手：${fmt(s.mulligans.yes)}</p><p>沒換手：${fmt(s.mulligans.no)}</p><p>未記錄：${fmt(s.mulligans.unknown)}</p></div></div>`+
+   `<h4>已記錄的前六回合出牌曲線</h4><div class="gdTurnCurve">${s.curve.map(x=>`<div><b>第 ${x.turn} 回合</b><div class="gdCurveTrack"><i style="width:${x.average===null?0:Math.min(100,x.average/8*100).toFixed(0)}%"></i></div><small>${x.average===null?'—':x.average.toFixed(1)+' 張'} · ${x.observed} 場記錄</small></div>`).join('')}</div><p class="tiny">只使用你主動記錄的每回合出牌張數；缺少資料顯示 —，不推測卡牌效果或勝率。</p><h4>個人對手統計</h4>${s.versus.length?`<div class="gdMatchupRows">${s.versus.slice(0,30).map(x=>`<div class="gdMatchupRow"><b>${esc(name(x.opponent))}</b><small>${esc(x.opponent)}</small><span>${x.wins}勝 ${x.losses}敗 ${x.ties}和</span><strong>${x.n} 場</strong></div>`).join('')}</div>`:'<p class="note">尚無符合條件的對戰紀錄。</p>'}`+
+   `<details><summary>最近紀錄 (${personalRows.length})</summary><div class="gdPersonalList">${personalRows.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,120).map(x=>`<div class="gdPersonalLine"><span>${esc(x.date)} · ${esc(x.myLeader)} vs ${esc(x.opponentLeader)} · ${x.result==='win'?'勝':x.result==='loss'?'敗':'和'}<small>${esc(x.notes)}</small></span><button type="button" data-gd-delete="${esc(x.id)}" aria-label="刪除此紀錄">刪除</button></div>`).join('')}</div></details>`;
+ }
+ async function parseFile(id){const file=$('#'+id)?.files?.[0];if(!file)throw Error('尚未選擇 '+id+' 檔案');if(file.size>6e6)throw Error('檔案超過 6MB 限制');const j=JSON.parse(await file.text());return Array.isArray(j)?j:j?.standings||j?.pairings||j?.matches||null;}
+ async function importPublic(){
+  try{const [standings,pairings]=await Promise.all([parseFile('gdStandings'),parseFile('gdPairings')]);
+   const url=input('gdEventUrl');const tournamentId=url.match(/\/tournament\/([a-z0-9-]+)/i)?.[1]||'';
+   const result=M.importLimitless({standings,pairings,tournamentId,date:input('gdEventDate'),sourceUrl:url,region:input('gdEventRegion'),format:input('gdEventFormat')});
+   if(!result.records.length)throw Error(`沒有可用配對（略過 ${result.stats.skipped} 筆）；請確認 standings 包含可識別的領航員卡號。`);
+   const prev=new Set(publicRows.map(x=>x.id));const next=publicRows.concat(result.records.filter(x=>!prev.has(x.id)));
+   if(!save(PUBLIC_KEY,next))return;const added=next.length-publicRows.length;publicRows=next;
+   notice(`匯入完成：新增 ${added} 場，原始配對 ${result.stats.total} 場，略過 ${result.stats.skipped}，去重 ${result.stats.duplicates}。資料標為未獨立核實。`);
+   renderMatchups();
+  }catch(e){notice('配對資料無法匯入：'+e.message);}
+ }
+ function addPersonal(){try{const item=M.validatePersonal({date:input('gdPersonalDate'),myLeader:input('gdAddMyLeader'),opponentLeader:input('gdAddOpponent'),result:input('gdAddResult'),first:input('gdAddFirst'),mulligan:input('gdAddMulligan'),turns:input('gdAddTurns'),region:input('gdAddRegion'),format:input('gdAddFormat'),turnPlays:input('gdAddTurnPlays'),notes:input('gdAddNotes')});
+  const next=[item,...personalRows];if(!save(PERSONAL_KEY,next))return;personalRows=next;
+  notice('私人對戰已記錄於這台裝置；不會計入公開賽事 Meta。');$('#gdAddNotes').value='';renderPersonal();
+ }catch(e){notice('資料未儲存：'+e.message);}}
+ async function importPersonal(){try{const file=$('#gdImportPersonal').files?.[0];if(!file)throw Error('請選擇 JSON');if(file.size>4e6)throw Error('檔案過大');const parsed=JSON.parse(await file.text());if(parsed?.format!=='grand-decks-personal-v14.3'||!Array.isArray(parsed.records)||parsed.records.length>5000)throw Error('不是有效的 v14.3 私人備份');
+  const added=parsed.records.map(M.validatePersonal),ids=new Set(personalRows.map(x=>x.id)),next=personalRows.concat(added.filter(x=>!ids.has(x.id)));if(!save(PERSONAL_KEY,next))return;personalRows=next;notice('私人對戰匯入成功，新增 '+(next.length-ids.size)+' 筆');renderPersonal();
+ }catch(e){notice('私人備份匯入失敗：'+e.message);}finally{$('#gdImportPersonal').value='';}}
+ function mount(){const host=$('#page-meta');if(!host||$('#gdMatchStats'))return;
+  const wrap=document.createElement('div');wrap.id='gdMatchStats';wrap.innerHTML=`
+   <section class="panel" id="gdMatchupPanel"><div class="panelheading"><strong>v14.2 · 對戰優劣研究</strong><span>獨立的實際配對資料</span></div><p class="tiny">先篩選 Leader、日期及賽區，再看配對勝敗。原有的 Top 8 統計不會混入對戰結果。</p>
+    <div class="gdFilters"><label>我的 Leader 卡號<input id="gdMatchLeader" placeholder="例如 OP01-001" maxlength="14"></label><label>對手 Leader（選填）<input id="gdMatchOpponent" placeholder="不填＝全部對手" maxlength="14"></label><label>日期<select id="gdMatchDays"><option value="0">不限日期</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option></select></label><label>賽區<select id="gdMatchRegion"><option value="ALL">全部</option><option value="TW">台灣</option><option value="JP">日本</option><option value="EN">英文環境</option><option value="EU">歐洲</option><option value="NA">北美</option><option value="ASIA">其他亞洲</option><option value="OTHER">其他</option></select></label></div>
+    <div id="gdMatchupSummary" class="note"></div><details><summary>匯入 Limitless 公開賽事配對（standings + pairings）</summary><p class="tiny">檔案須來自相同賽事，且 standings 必須包含可識別 Leader 卡號；未知者會跳過。匯入檔案由使用者提供，本站無法自動驗證真實性。</p>
+     <div class="gdFilters"><label>賽事網址<input id="gdEventUrl" placeholder="https://play.limitlesstcg.com/tournament/..." type="url"></label><label>賽事日期<input id="gdEventDate" type="date"></label><label>賽區<select id="gdEventRegion"><option value="OTHER">其他／未知</option><option value="JP">日本</option><option value="TW">台灣</option><option value="EU">歐洲</option><option value="NA">北美</option><option value="ASIA">其他亞洲</option><option value="EN">英文環境</option></select></label><label>賽制<input id="gdEventFormat" placeholder="standard / event format" maxlength="40"></label><label>standings JSON<input id="gdStandings" type="file" accept=".json,application/json"></label><label>pairings JSON<input id="gdPairings" type="file" accept=".json,application/json"></label></div>
+     <div class="actions"><button id="gdImportEvent" class="secondary small" type="button">驗證並匯入配對</button><button id="gdExportEvent" class="secondary small" type="button">備份匯入配對</button></div></details>
+   </section>
+   <section class="panel" id="gdPersonalPanel"><div class="panelheading"><strong>v14.3 · 個人對戰戰術日誌</strong><span>只在目前瀏覽器</span></div>
+    <div class="gdFilters"><label>我的 Leader 篩選<input id="gdMyLeader" maxlength="14" placeholder="空白＝全部"></label><label>日期<select id="gdMyDays"><option value="0">全部紀錄</option><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option></select></label><label>賽區<select id="gdMyRegion"><option value="ALL">全部</option><option value="TW">台灣</option><option value="JP">日本</option><option value="EN">英文</option><option value="OTHER">其他</option></select></label></div>
+    <div id="gdPersonalSummary" class="note"></div><details><summary>新增一筆真實對戰紀錄</summary>
+     <div class="gdFilters"><label>日期<input id="gdPersonalDate" type="date"></label><label>我方 Leader 卡號<input id="gdAddMyLeader" maxlength="14" placeholder="OP01-001"></label><label>對方 Leader 卡號<input id="gdAddOpponent" maxlength="14" placeholder="OP05-060"></label><label>結果<select id="gdAddResult"><option value="win">勝</option><option value="loss">敗</option><option value="tie">和</option></select></label><label>先後手<select id="gdAddFirst"><option value="unknown">未紀錄</option><option value="first">先手</option><option value="second">後手</option></select></label><label>有否換手<select id="gdAddMulligan"><option value="unknown">未紀錄</option><option value="yes">有</option><option value="no">無</option></select></label><label>回合數（可留空）<input id="gdAddTurns" type="number" min="1" max="300" placeholder="未知"></label><label>賽區<select id="gdAddRegion"><option value="TW">台灣</option><option value="JP">日本</option><option value="EN">英文</option><option value="OTHER">其他</option></select></label><label>賽制<select id="gdAddFormat"><option value="unknown">未知</option><option value="standard">Standard</option><option value="extended">Extended</option></select></label><label class="gdWide">前六回合出牌張數（選填；例如 1:1,2:2,3:1）<input id="gdAddTurnPlays" placeholder="1:1,2:2,3:1" maxlength="65"></label><label class="gdWide">備註（選填）<textarea id="gdAddNotes" rows="2" maxlength="600" placeholder="關鍵戰術、失誤、起手重點"></textarea></label></div><button id="gdAddMatch" class="primary small" type="button">儲存這場對戰</button></details>
+     <div class="actions"><button id="gdExportPersonal" class="secondary small" type="button">匯出個人戰績 JSON</button><label class="fileLabel small">匯入私人備份<input id="gdImportPersonal" type="file" accept=".json,application/json" hidden></label></div>
+     <p class="tiny">自填資料與 v15 AI 練習完全分開；清除瀏覽器網站資料前務必匯出備份。</p></section>
+    <p class="note" id="gdMatchNotice" role="status" aria-live="polite"></p>`;
+   host.appendChild(wrap);$('#gdPersonalDate').value=today();$('#gdEventDate').value=today();
+   try{if(typeof currentDeck==='object'&&currentDeck.leaderId){$('#gdMatchLeader').value=currentDeck.leaderId;$('#gdAddMyLeader').value=currentDeck.leaderId;$('#gdMyLeader').value=currentDeck.leaderId;}}catch{}
+   for(const id of ['gdMatchLeader','gdMatchOpponent','gdMatchDays','gdMatchRegion'])$('#'+id).addEventListener(id.includes('Leader')||id.includes('Opponent')?'input':'change',renderMatchups);
+   for(const id of ['gdMyLeader','gdMyDays','gdMyRegion'])$('#'+id).addEventListener(id==='gdMyLeader'?'input':'change',renderPersonal);
+   $('#gdImportEvent').addEventListener('click',importPublic);$('#gdAddMatch').addEventListener('click',addPersonal);
+   $('#gdExportEvent').addEventListener('click',()=>download('grand-decks-limitless-matchups.json',{schema:1,source:'limitless-import',note:'User-imported, not independently verified',records:publicRows}));
+   $('#gdExportPersonal').addEventListener('click',()=>download('grand-decks-personal-matches.json',{format:'grand-decks-personal-v14.3',exportedAt:new Date().toISOString(),records:personalRows}));
+   $('#gdImportPersonal').addEventListener('change',importPersonal);
+   wrap.addEventListener('click',e=>{const b=e.target.closest('[data-gd-delete]');if(!b)return;const item=personalRows.find(x=>x.id===b.dataset.gdDelete);if(!item||!confirm(`刪除 ${item.date} 的紀錄？`))return;const next=personalRows.filter(x=>x.id!==item.id);if(!save(PERSONAL_KEY,next))return;personalRows=next;renderPersonal();notice('已刪除私人紀錄');});
+   renderMatchups();renderPersonal();
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
+})();
+
+</script>
+<script id="grand-decks-arena-core">
+/* GRAND DECKS v15.0 / v15.1 BASIC PRACTICE ENGINE.
+ * This is a learning sandbox, NOT a tournament-authoritative game engine.
+ * Not supported automatically: card abilities, on-play effects, triggers,
+ * blocker effects, counter events, rush, leader-specific deck exceptions, stage effects.
+ */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.GrandArenaCore = api;
+})(typeof globalThis === 'object' ? globalThis : this, function () {
+  'use strict';
+  const VERSION = '15.1-basic-2';
+  const LIMIT = 50;
+  const own = (o,k) => Object.prototype.hasOwnProperty.call(o,k);
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const integer = n => Number.isInteger(n) && n >= 0;
+  const getInfo = (lookup,id) => lookup(id) || null;
+  const isId = id => /^[A-Z0-9]{1,10}-\d{2,4}$/i.test(String(id||''));
+  function validateDeck(deck, lookup) {
+    if (!deck || !isId(deck.leaderId) || !deck.items || typeof deck.items !== 'object' || Array.isArray(deck.items)) return 'Leader 或牌組資料格式不正確';
+    const leader = getInfo(lookup,deck.leaderId);
+    if (!leader || leader.category !== 'Leader') return `領航員 ${deck.leaderId} 未收錄於卡庫`;
+    const keys = Object.keys(deck.items);
+    if (!keys.length || keys.length > 50 || keys.some(id=>!isId(id)||!integer(deck.items[id])||deck.items[id]<1||deck.items[id]>4)) return '卡號或同卡張數不合法';
+    if (keys.reduce((n,id)=>n+deck.items[id],0)!==LIMIT) return '主牌組必須恰好 50 張';
+    for (const id of keys) {
+      const card = getInfo(lookup,id);
+      if (!card || card.category==='Leader' || card.category==='Don') return `未收錄或不支援的主牌：${id}`;
+      if (!(card.colors||[]).some(color=>(leader.colors||[]).includes(color))) return `與領航員顏色不符：${id}`;
+    }
+    return '';
+  }
+  function deckCards(d) {
+    const out=[];
+    for (const [id,n] of Object.entries(d.items)) for(let i=0;i<n;i++) out.push(id);
+    return out;
+  }
+  function shuffle(input,random=Math.random) {
+    const items=input.slice();
+    for(let i=items.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[items[i],items[j]]=[items[j],items[i]];}
+    return items;
+  }
+  function player(deck,life,random) {
+    const all=shuffle(deckCards(deck),random);
+    const hand=all.splice(0,5), lifes=all.splice(0,life);
+    return {name:String(deck.name||deck.leaderId).slice(0,60),leaderId:deck.leaderId,draw:all,hand,life:lifes,trash:[],board:[],turns:0,donTotal:0,donReady:0,donRested:0,leaderRested:false,leaderDon:0};
+  }
+  function create({my,opponent,lifeMy=5,lifeOpponent=5,mode='manual',aiStyle='balanced',random=Math.random,first=0},lookup) {
+    if (mode!=='manual'&&mode!=='ai') throw Error('不支援的模式');
+    if(![lifeMy,lifeOpponent].every(n=>Number.isInteger(n)&&n>=1&&n<=10)) throw Error('Life 數量必須由玩家核對');
+    for(const d of [my,opponent]){const err=validateDeck(d,lookup);if(err)throw Error(err);}
+    const s={version:VERSION,mode,aiStyle:['basic','balanced','aggressive'].includes(aiStyle)?aiStyle:'balanced',players:[player(my,lifeMy,random),player(opponent,lifeOpponent,random)],turn:first===1?1:0,round:0,pending:null,winner:null,serial:1,log:[],notice:'示範模式：卡牌文字效果與觸發不會自動執行。'};
+    begin(s);return s;
+  }
+  function note(s,message){s.log.push(message);if(s.log.length>120)s.log.shift();s.notice=message;}
+  function must(s,condition,message){if(s.winner!==null)throw Error('對戰已結束');if(!condition)throw Error(message);}
+  function begin(s){
+    const p=s.players[s.turn];p.turns++;s.round++;
+    // Refresh: all attached/rested DON!! returns active. All rested cards refresh.
+    p.donReady=p.donTotal;p.donRested=0;p.leaderDon=0;p.leaderRested=false;
+    for(const c of p.board){c.ready=true;c.don=0;}
+    // First player skips draw on their very first turn only.
+    if (!(s.round===1) && !draw(s,s.turn,true)) return;
+    const gained=Math.min(10-p.donTotal,s.round===1?1:2);
+    p.donTotal+=gained;p.donReady+=gained;
+    note(s,`${s.turn?'對手':'我方'}第 ${p.turns} 回合：重置、${s.round===1?'先攻跳過抽牌':'抽牌'}、獲得 ${gained} DON!!`);
+  }
+  function draw(s,side,internal=false) {
+    const p=s.players[side];if(!internal)must(s,s.turn===side,'只能在自己的回合抽牌');
+    if(!p.draw.length){s.winner=1-side;note(s,`${side?'對手':'我方'}牌庫已空，對手獲勝（練習規則）`);return false;}
+    p.hand.push(p.draw.shift());return true;
+  }
+  function play(s,index,lookup) {
+    const p=s.players[s.turn],id=p.hand[index],card=getInfo(lookup,id);
+    must(s,typeof id==='string'&&!!card,'找不到手牌');
+    must(s,card.category==='Character','此模式僅自動處理角色卡，事件與場景效果請勿當成已支援');
+    must(s,integer(card.cost),'這張卡沒有可核實的出場費用');
+    must(s,p.board.length<5,'角色區最多 5 張');
+    must(s,card.cost<=p.donReady,'DON!! 不足');
+    p.hand.splice(index,1);p.donReady-=card.cost;p.donRested+=card.cost;
+    p.board.push({key:'c'+s.serial++,id,ready:true,entered:p.turns,don:0});
+    note(s,`${s.turn?'對手':'我方'}支付 ${card.cost} DON!!，打出 ${id}（卡牌效果未自動結算）`);
+  }
+  function attach(s,key) {
+    const p=s.players[s.turn];must(s,p.donReady>0,'沒有可用 DON!!');
+    if(key==='leader')p.leaderDon++;
+    else {const unit=p.board.find(c=>c.key===key);must(s,!!unit,'找不到角色');unit.don++;}
+    p.donReady--;note(s,`${s.turn?'對手':'我方'}附加 1 DON!! 到${key==='leader'?'領航員':'角色'}`);
+  }
+  function strength(p,key,lookup) {
+    const unit=key==='leader'?null:p.board.find(c=>c.key===key);
+    const card=getInfo(lookup,unit?unit.id:p.leaderId);
+    return Number(card?.power||0)+1000*(unit?unit.don:p.leaderDon);
+  }
+  function attack(s,source,target,lookup) {
+    const p=s.players[s.turn],enemy=s.players[1-s.turn];
+    must(s,p.turns>1,'雙方自己的第一回合都不可攻擊');
+    must(s,!s.pending,'上一場攻擊尚未結算');
+    if(source==='leader'){must(s,!p.leaderRested,'領航員已橫置');}
+    else {const card=p.board.find(c=>c.key===source);must(s,!!card&&card.ready,'角色不在可攻擊狀態');must(s,card.entered<p.turns,'角色剛登場，尚不能攻擊（Rush 未實作）');}
+    if(target!=='leader'){const def=enemy.board.find(c=>c.key===target);must(s,!!def&&!def.ready,'只能攻擊已橫置的角色');}
+    if(source==='leader')p.leaderRested=true;else p.board.find(c=>c.key===source).ready=false;
+    s.pending={attacker:s.turn,defender:1-s.turn,source,target,attackPower:strength(p,source,lookup),defensePower:strength(enemy,target,lookup),counterAdded:0};
+    note(s,`${s.turn?'對手':'我方'}宣告攻擊 ${target==='leader'?'領航員':'已橫置角色'}（${s.pending.attackPower} vs ${s.pending.defensePower}）`);
+  }
+  function counter(s,index,lookup) {
+    const a=s.pending;must(s,!!a,'沒有待處理攻擊');const p=s.players[a.defender],id=p.hand[index],c=getInfo(lookup,id);
+    must(s,!!c&&Number(c.counter)>0,'此手牌沒有可確認的 Counter 數值');
+    const value=Number(c.counter);p.hand.splice(index,1);p.trash.push(id);a.counterAdded+=value;
+    note(s,`${a.defender?'對手':'我方'}棄掉 ${id}，Counter +${value}`);
+  }
+  function resolve(s){
+    const a=s.pending;must(s,!!a,'沒有待處理攻擊');
+    const defending=s.players[a.defender];const hit=a.attackPower>=a.defensePower+a.counterAdded;
+    if(hit){
+      if(a.target==='leader'){
+        if(defending.life.length){const id=defending.life.shift();defending.hand.push(id);note(s,`攻擊命中！${a.defender?'對手':'我方'} Life −1，移至手牌（Trigger 未處理）`);}
+        else {s.winner=a.attacker;note(s,`${a.attacker?'對手':'我方'}獲勝（Life 歸零後再次命中）`);}
+      } else {const k=defending.board.findIndex(c=>c.key===a.target);if(k>=0){defending.trash.push(defending.board[k].id);defending.board.splice(k,1);note(s,'角色戰鬥 K.O.');}}
+    } else note(s,`防守成功，攻擊未命中（${a.attackPower} < ${a.defensePower+a.counterAdded}）`);
+    s.pending=null;
+    return hit;
+  }
+  function end(s){must(s,!s.pending,'請先結算正在進行的攻擊');s.turn=1-s.turn;begin(s);}
+  function affordable(p,lookup){return p.hand.map((id,index)=>({index,id,card:getInfo(lookup,id)})).filter(x=>x.card?.category==='Character'&&integer(x.card.cost)&&x.card.cost<=p.donReady&&p.board.length<5);}
+  function aiCounter(s,lookup){
+    const a=s.pending;
+    if(!a||a.defender!==1)return;
+    const p=s.players[1],needed=a.attackPower-a.defensePower+1000;
+    if(needed>0 && (p.life.length<=2 || a.target!=='leader')) {
+      const choices=p.hand.map((id,i)=>({id,i,n:Number(getInfo(lookup,id)?.counter||0)})).filter(x=>x.n>0).sort((x,y)=>x.n-y.n);
+      const suitable=choices.find(x=>x.n>=needed);
+      if(suitable)counter(s,suitable.i,lookup);
+    }
+    resolve(s);
+  }
+  function aiAct(s,lookup){
+    if(s.turn!==1||s.winner!==null||s.pending)return;
+    const p=s.players[1],enemy=s.players[0];let guard=0;
+    while(s.turn===1&&s.winner===null&&!s.pending&&guard++<24){
+      const choices=affordable(p,lookup).sort((x,y)=>s.aiStyle==='basic'
+        ? x.card.cost-y.card.cost || x.id.localeCompare(y.id)
+        : s.aiStyle==='aggressive'
+          ? Number(y.card.power||0)-Number(x.card.power||0) || x.card.cost-y.card.cost
+          : (Number(y.card.power||0)/Math.max(1,y.card.cost))-(Number(x.card.power||0)/Math.max(1,x.card.cost)) || x.card.cost-y.card.cost);
+      if(choices.length){play(s,choices[0].index,lookup);continue;}
+      if(p.turns>1){
+        const attackers=[...p.board.filter(x=>x.ready&&x.entered<p.turns).map(x=>x.key),...(p.leaderRested?[]:['leader'])];
+        if(attackers.length){
+          const target=enemy.board.filter(x=>!x.ready).sort((a,b)=>strength(enemy,a.key,lookup)-strength(enemy,b.key,lookup))[0]?.key||'leader';
+          const source=attackers.sort((a,b)=>strength(p,b,lookup)-strength(p,a,lookup))[0];
+          if(p.donReady>0 && s.aiStyle!=='basic' && (s.aiStyle==='aggressive' || strength(p,source,lookup)<strength(enemy,target,lookup))){attach(s,source);continue;}
+          attack(s,source,target,lookup);break;
+        }
+      }
+      end(s);break;
+    }
+    if(guard>=24 && !s.pending && s.turn===1)end(s);
+  }
+  return {VERSION,validateDeck,create,play,attach,attack,counter,resolve,end,aiAct,aiCounter,strength,draw,clone};
+});
+
+</script>
+<script id="grand-decks-arena-ui">
+/* GRAND DECKS v15 arena. Zero paid services, no external network, same card catalogue. */
+(function () {
+  'use strict';
+  const Core=window.GrandArenaCore;
+  const $=q=>document.querySelector(q);
+  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const lookup=id=>typeof window.grandCardInfo==='function'?window.grandCardInfo(id):null;
+  const SAVE='grand-decks-arena-v15-practice';
+  const RESULTS='grand-decks-arena-v15-results';
+  let state=null,undos=[],selectedAttacker='',lastOutcome='',resultRecorded=false;
+  const snapshot=()=>Core.clone(state);
+  const setMessage=message=>{lastOutcome=message;const el=$('#arenaMessage');if(el)el.textContent=message;};
+  const options=()=>{const rows=[];try{if(typeof currentDeck==='object'&&currentDeck.leaderId)rows.push({...currentDeck,name:'目前組牌草稿',id:'__draft__'});}catch{}
+    try{if(Array.isArray(decks)) rows.push(...decks);}catch{}return rows;};
+  const pool=new Map();
+  async function loadDecks(){
+    pool.clear();
+    for(const d of options())if(!Core.validateDeck(d,lookup))pool.set(String(d.id||'draft'+pool.size),d);
+    try{if(typeof get==='function'){const saved=await get('decks');if(Array.isArray(saved))for(const d of saved)if(!Core.validateDeck(d,lookup))pool.set(String(d.id||'local'+pool.size),d);}}catch{}
+    const select=$('#arenaMyDeck'),rival=$('#arenaOpponentDeck');if(!select||!rival)return;
+    const previous=select.value,other=rival.value;
+    const markup=[...pool].map(([id,d])=>`<option value="${esc(id)}">${esc(d.name||d.leaderId)} · ${esc(d.leaderId)}</option>`).join('');
+    select.innerHTML=markup||'<option value="">尚無有效的 50 張牌組</option>';
+    rival.innerHTML='<option value="__mirror__">鏡像使用我的牌組</option>'+markup;
+    if(pool.has(previous))select.value=previous;
+    if(other==='__mirror__'||pool.has(other))rival.value=other;
+    $('#arenaStart').disabled=!pool.size;
+    const tip=$('#arenaDeckHint');
+    if(tip)tip.textContent=pool.size?`已找到 ${pool.size} 套可用牌組（尚未檢查官方特殊規則與禁限卡）。`:'目前沒有完整 50 張牌組。請先到「組牌工作室」完成並儲存牌組，再回來選擇。';
+  }
+  function frontCard(id,options={}) {
+    const c=lookup(id);
+    const image=c&&typeof cardImageTag==='function'?cardImageTag(c):'';
+    return `<span class="arenaArt" title="${esc(c?.name||id)}">${image||'<span class="arenaArtFallback">'+esc(id)+'</span>'}</span>`;
+  }
+  function render(){
+    const setup=$('#arenaSetup'),play=$('#arenaPlay');if(!setup||!play)return;
+    setup.hidden=!!state;play.hidden=!state;
+    const restore=$('#arenaRestore');if(restore){let saved=false;try{saved=!!localStorage.getItem(SAVE);}catch{}restore.hidden=!!state||!saved;}
+    if(!state)return;
+    const s=state,p=s.players[s.turn],opp=s.players[1-s.turn],mine=s.players[0];
+    const active=s.turn===0?'我方':'對手';
+    const pending=s.pending,defending=pending?s.players[pending.defender]:null;
+    const header=$('#arenaStatus');header.textContent=s.winner!==null?`練習結束 · ${s.winner===0?'我方':'對手'}獲勝`:`第 ${s.round} 個回合｜${active}行動｜${s.mode==='ai'?'本機基礎 AI（'+(s.aiStyle||'balanced')+'）':'同機雙方練習'}`;
+    $('#arenaMessage').textContent=lastOutcome||s.notice;
+    $('#arenaUndo').disabled=undos.length===0;
+    $('#arenaEnd').disabled=!!pending||s.winner!==null||s.mode==='ai'&&s.turn===1;
+    $('#arenaAiNext').hidden=!(s.mode==='ai'&&s.turn===1&&!pending&&s.winner===null);
+    if(s.winner!==null&&!resultRecorded){
+      resultRecorded=true;
+      try{const rows=JSON.parse(localStorage.getItem(RESULTS)||'[]');rows.unshift({date:new Date().toISOString(),winner:s.winner,mode:s.mode,myLeader:s.players[0].leaderId,opponentLeader:s.players[1].leaderId,practice:true});localStorage.setItem(RESULTS,JSON.stringify(rows.slice(0,80)));}catch{}
+    }
+    $('#arenaEnemy').innerHTML=playerView(s,1);
+    $('#arenaSelf').innerHTML=playerView(s,0);
+    const ctl=$('#arenaControl');
+    if(s.winner!==null)ctl.innerHTML=`<div class="arenaCallout">練習勝方：${s.winner===0?'我方':'對手'}。本結果只保存在本機，不會算入 Meta 勝率。</div>`;
+    else if(pending){
+      const defender=pending.defender;
+      const hiddenAI=s.mode==='ai'&&defender===1;
+      ctl.innerHTML=`<div class="arenaCallout"><strong>攻擊結算中</strong><div>${pending.attacker===0?'我方':'對手'} ${pending.attackPower} ➜ ${pending.target==='leader'?'領航員':'角色'} ${pending.defensePower+pending.counterAdded}</div>`+
+       (hiddenAI?'<p>對手 AI 正在防守…</p>':`<p>防守方：${defender===0?'我方':'對手'}。可使用具已知數值的角色 Counter，或直接結算。</p><div class="arenaCounters">${defending.hand.map((id,i)=>{const c=lookup(id);const n=Number(c?.counter||0);return n>0?`<button class="secondary small" data-arena-counter="${i}">${esc(id)} +${n}</button>`:'';}).join('')||'<small>沒有已知 Counter 可用</small>'}</div><button class="primary small" data-arena-resolve>結算這次攻擊</button>`)+`</div>`;
+    } else if(selectedAttacker){
+      ctl.innerHTML=`<div class="arenaCallout"><strong>選擇攻擊目標</strong><div class="arenaTargetChoices"><button class="primary small" data-arena-target="leader">對手領航員</button>${opp.board.filter(c=>!c.ready).map(c=>`<button class="secondary small" data-arena-target="${esc(c.key)}">${esc(c.id)}（橫置）</button>`).join('')}</div><button class="secondary small" data-arena-cancel>取消</button></div>`;
+    } else ctl.innerHTML=`<p class="tiny">選擇可攻擊的領航員／角色，再選擇攻擊目標。DON!!、出場及攻擊採簡化規則，卡牌效果未自動實作。</p>`;
+    try{localStorage.setItem(SAVE,JSON.stringify({version:Core.VERSION,state}));}catch{}
+  }
+  function playerView(s,side){
+    const p=s.players[side],current=s.turn===side,hiddenHand=s.mode==='ai'&&side===1;
+    const acting=current&&s.winner===null&&!s.pending&&(side===0||s.mode==='manual');
+    const attackable=acting&&p.turns>1;
+    const leader=lookup(p.leaderId);
+    const leaderBlock=`<div class="arenaLeader">${frontCard(p.leaderId)}<div class="arenaLeaderDetails"><strong>${esc(leader?.name||p.leaderId)}</strong><small>${esc(p.leaderId)}</small><div class="arenaBadges"><span>Life ${p.life.length}</span><span>牌庫 ${p.draw.length}</span><span>手牌 ${p.hand.length}</span></div><div class="arenaBadges"><span>DON!! ${p.donReady} 可用／${p.donTotal} 總計</span><span>${p.leaderRested?'橫置':'直立'}</span><span>附加 ${p.leaderDon}</span></div><div class="arenaCardActions">${acting&&p.donReady>0?'<button class="secondary small" data-arena-attach="leader">+ DON!!</button>':''}${attackable&&!p.leaderRested?'<button class="secondary small" data-arena-attack="leader">攻擊</button>':''}</div></div></div>`;
+    const board=p.board.map(c=>{
+      const card=lookup(c.id);
+      const canStrike=attackable&&c.ready&&c.entered<p.turns;
+      return `<div class="arenaUnit">${frontCard(c.id)}<div class="arenaUnitText"><strong>${esc(card?.name||c.id)}</strong><small>${esc(c.id)} · ${Number(card?.power)||'?'} P · DON!! +${c.don}</small><span>${c.ready?'直立':'橫置'}${c.entered===p.turns?' · 本回合登場':''}</span><div class="arenaCardActions">${acting&&p.donReady>0?`<button class="secondary small" data-arena-attach="${esc(c.key)}">+ DON!!</button>`:''}${canStrike?`<button class="secondary small" data-arena-attack="${esc(c.key)}">攻擊</button>`:''}</div></div></div>`;
+    }).join('')||'<p class="tiny">角色區尚無角色</p>';
+    const hand = hiddenHand?`<div class="arenaHiddenHand">對手手牌 ${p.hand.length} 張（內容隱藏）</div>`:
+      `<div class="arenaHand">${p.hand.map((id,i)=>{
+        const c=lookup(id),cost=c?.cost,playable=acting&&c?.category==='Character'&&Number.isInteger(cost)&&cost<=p.donReady&&p.board.length<5;
+        return `<div class="arenaHandCard">${frontCard(id)}<div><strong>${esc(c?.name||id)}</strong><small>${esc(id)} · ${esc(c?.category||'?')} · ${cost??'?'} 費</small>${acting?`<button class="secondary small" data-arena-play="${i}" ${playable?'':'disabled'}>${playable?'出場':'效果未支援／DON!! 不足'}</button>`:''}</div></div>`;
+      }).join('')||'<p class="tiny">手牌為空</p>'}</div>`;
+    return `<section class="arenaPlayer ${current?'arenaActiveSide':''}"><h3>${side===0?'我方':'對手'} · ${esc(p.name)} ${current?'<span class="arenaActivePill">行動方</span>':''}</h3>${leaderBlock}<h4>角色區 ${p.board.length}/5</h4><div class="arenaBoard">${board}</div><h4>${hiddenHand?'隱藏手牌':'手牌'}</h4>${hand}</section>`;
+  }
+  function act(callback){
+    if(!state)return;
+    const old=snapshot();
+    try{
+      callback();undos.push(old);if(undos.length>40)undos.shift();
+      if(state.mode==='ai'){
+        if(state.pending&&state.pending.defender===1)Core.aiCounter(state,lookup);
+        if(state.turn===1&&!state.pending&&state.winner===null)Core.aiAct(state,lookup);
+      }
+      selectedAttacker='';lastOutcome=state.notice;render();
+    }catch(e){state=old;selectedAttacker='';setMessage('操作未執行：'+e.message);render();}
+  }
+  function start(){
+    const my=pool.get($('#arenaMyDeck').value);
+    const opp=$('#arenaOpponentDeck').value==='__mirror__'?my:pool.get($('#arenaOpponentDeck').value);
+    if(!my||!opp){setMessage('請先選擇有效的牌組');return;}
+    try{
+      const mode=$('#arenaMode').value;
+      state=Core.create({my,opponent:opp,mode,aiStyle:$('#arenaAiStyle').value,lifeMy:Number($('#arenaLifeMy').value),lifeOpponent:Number($('#arenaLifeOpp').value),first:Number($('#arenaFirst').value)},lookup);
+      undos=[];resultRecorded=false;selectedAttacker='';lastOutcome='已建立本機練習對局；複雜卡牌能力尚未支援。';
+      if(mode==='ai'&&state.turn===1)Core.aiAct(state,lookup);
+      render();
+    }catch(e){setMessage('無法開始：'+e.message);}
+  }
+  function reset(){
+    if(state&&!confirm('結束目前練習並回到選擇牌組？此場未結束的進度會清除。'))return;
+    state=null;undos=[];selectedAttacker='';resultRecorded=false;lastOutcome='';
+    try{localStorage.removeItem(SAVE);}catch{}
+    render();loadDecks();
+  }
+  function restore(){
+    try{
+      const o=JSON.parse(localStorage.getItem(SAVE)||'null');
+      if(!o||o.version!==Core.VERSION||!o.state||!Array.isArray(o.state.players)||o.state.players.length!==2)throw Error('版本不相容');
+      state=o.state;undos=[];selectedAttacker='';resultRecorded=state.winner!==null;lastOutcome='已恢復此裝置先前的本機練習（非線上真人對戰）。';render();
+    }catch(e){setMessage('無法恢復：'+e.message);}
+  }
+  function exportReplay(){if(!state)return;const payload={schema:'grand-decks-practice-v15',date:new Date().toISOString(),mode:state.mode,leaders:state.players.map(p=>p.leaderId),turns:state.round,winner:state.winner,log:state.log,disclaimer:'練習沙盒，未處理卡牌效果；不可視為賽事對戰紀錄。'};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='grand-decks-practice-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+  }
+  function mount(){
+    if(!Core||!document.getElementById('mainContent')||$('#page-arena'))return;
+    const page=document.createElement('section');page.className='page';page.id='page-arena';page.innerHTML=`
+     <div class="pageHead"><div><span class="eyebrow">GRAND DECKS · ARENA</span><h1>對戰競技場｜基礎練習</h1><p>v15.0 同機雙人操作 ＋ v15.1 本機規則型 AI。尚非完整官方對戰模擬器。</p></div></div>
+     <div class="arenaWarning" role="note">練習模式：支援基本抽牌、DON!!、角色出場、攻擊、角色 Counter 與 Life；<strong>卡牌效果、Rush、Blocker、Trigger、事件／場景、特殊規則尚未自動判定</strong>。請勿將結果計入正式 Meta 勝率。沒有真人線上連線。</div>
+     <section class="panel" id="arenaSetup">
+      <div class="panelheading"><strong>選擇雙方牌組</strong><span>僅從本機已儲存牌組讀取</span></div>
+      <div class="arenaForm"><label>我的牌組<select id="arenaMyDeck"></select></label><label>對手牌組<select id="arenaOpponentDeck"></select></label><label>練習模式<select id="arenaMode"><option value="manual">v15.0 · 同機控制雙方</option><option value="ai">v15.1 · 本機基礎 AI</option></select></label><label>AI 行動風格<select id="arenaAiStyle"><option value="basic">基礎 · 低費優先</option><option value="balanced" selected>均衡 · 效率優先</option><option value="aggressive">進取 · 優先進攻</option></select></label><label>先手<select id="arenaFirst"><option value="0">我方先手</option><option value="1">對手先手</option></select></label><label>我方 Leader Life<select id="arenaLifeMy"><option value="5">5（預設示意，請核對）</option><option value="4">4</option><option value="6">6</option><option value="3">3</option></select></label><label>對手 Leader Life<select id="arenaLifeOpp"><option value="5">5（預設示意，請核對）</option><option value="4">4</option><option value="6">6</option><option value="3">3</option></select></label></div>
+      <p class="tiny" id="arenaDeckHint">讀取本機牌組中…</p><p class="tiny">AI 三種行動風格僅是不同的規則型策略，不等同 OPlayTCG 的 Expert AI。Leader Life 需依實際卡牌核對；目前卡庫未完整提供該數值。雙人模式是同一裝置操作，不是網路真人對戰。</p>
+      <div class="actions"><button class="primary" id="arenaStart">開始基礎練習</button><button class="secondary" id="arenaRefreshDecks">重新讀取牌組</button><button class="secondary" id="arenaRestore" hidden>恢復上一場練習</button></div>
+     </section>
+     <section id="arenaPlay" hidden><div class="arenaToolbar"><strong id="arenaStatus"></strong><div class="arenaToolButtons"><button class="secondary small" id="arenaUndo">復原一步</button><button class="secondary small" id="arenaSaveLog">匯出紀錄</button><button class="secondary small" id="arenaReset">結束練習</button></div></div>
+      <div id="arenaMessage" class="arenaMsg" role="status" aria-live="polite"></div><div id="arenaEnemy"></div><div id="arenaControl"></div><div id="arenaSelf"></div>
+      <div class="arenaEndBar"><button id="arenaEnd" class="primary">結束目前回合</button><button id="arenaAiNext" class="secondary" hidden>繼續 AI 回合</button></div>
+      <details class="arenaLog"><summary>操作紀錄（最近 120 筆）</summary><div id="arenaLogLines"></div></details>
+     </section>`;
+    document.getElementById('mainContent').appendChild(page);
+    const sidebar=document.querySelector('.sidebar');if(sidebar){const b=document.createElement('button');b.className='nav';b.dataset.page='arena';b.innerHTML='<span>⚔</span> 對戰競技場';sidebar.querySelector('[data-page="decks"]')?.before(b);b.addEventListener('click',()=>{nav('arena');loadDecks();render();});}
+    const bottom=document.querySelector('.bottomnav');if(bottom){const b=document.createElement('button');b.dataset.page='arena';b.innerHTML='⚔<span>對戰</span>';bottom.querySelector('[data-page="decks"]')?.before(b);b.addEventListener('click',()=>{nav('arena');loadDecks();render();});}
+    const grid=document.querySelector('.featuregrid');if(grid){const b=document.createElement('button');b.className='feature';b.innerHTML='<span class="featureIcon">⚔</span><strong>基礎對戰練習</strong><p>自選牌組，雙方同機練習或挑戰本機 AI。</p><span class="featureNext">開始 →</span>';b.addEventListener('click',()=>{nav('arena');loadDecks();render();});grid.appendChild(b);}
+    $('#arenaStart').addEventListener('click',start);$('#arenaRefreshDecks').addEventListener('click',loadDecks);$('#arenaRestore').addEventListener('click',restore);$('#arenaReset').addEventListener('click',reset);$('#arenaSaveLog').addEventListener('click',exportReplay);
+    $('#arenaUndo').addEventListener('click',()=>{if(!undos.length)return;state=undos.pop();selectedAttacker='';resultRecorded=false;lastOutcome='已復原上一步';render();});
+    $('#arenaEnd').addEventListener('click',()=>act(()=>Core.end(state)));
+    $('#arenaAiNext').addEventListener('click',()=>act(()=>Core.aiAct(state,lookup)));
+    $('#arenaPlay').addEventListener('click',e=>{
+      const b=e.target.closest('button');if(!b||b.disabled)return;
+      if(b.dataset.arenaPlay!==undefined){act(()=>Core.play(state,Number(b.dataset.arenaPlay),lookup));}
+      if(b.dataset.arenaAttach!==undefined){act(()=>Core.attach(state,b.dataset.arenaAttach));}
+      if(b.dataset.arenaAttack!==undefined){selectedAttacker=b.dataset.arenaAttack;render();}
+      if(b.dataset.arenaCancel!==undefined){selectedAttacker='';render();}
+      if(b.dataset.arenaTarget!==undefined&&selectedAttacker){const source=selectedAttacker;act(()=>Core.attack(state,source,b.dataset.arenaTarget,lookup));}
+      if(b.dataset.arenaCounter!==undefined){act(()=>Core.counter(state,Number(b.dataset.arenaCounter),lookup));}
+      if(b.dataset.arenaResolve!==undefined){act(()=>Core.resolve(state));}
+    });
+    const originalRender=render;
+    render=functionRenderWithLog(originalRender);
+    render();loadDecks();
+  }
+  function functionRenderWithLog(base){return function(){base();if(state){const el=$('#arenaLogLines');if(el)el.innerHTML=state.log.slice(-120).map(text=>`<p>${esc(text)}</p>`).join('');}};}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
+})();
+
+</script>
+
+<script id="gd-release-v151">
+(() => {
+ 'use strict';
+ const update=()=>{
+  const chip=document.getElementById('versionHistoryBtn');
+  if(chip){chip.textContent='v15.1 · 更新紀錄';chip.setAttribute('aria-label','目前 v15.1，查看更新紀錄');}
+  const history=window.GRAND_DECKS_RELEASES;
+  const versions=[
+   {version:'15.1',date:'2026-11-24',status:'本機 AI 練習',title:'對戰競技場：本機基礎 AI',changes:['可選擇三種基礎策略、AI 自動出牌與攻防','卡牌效果與特殊規則尚未完整模擬，結果只作練習']},
+   {version:'15.0',date:'2026-11-24',status:'同機對戰練習',title:'可操作對戰桌面',changes:['自選兩副合法牌組進行雙方操作、抽牌、DON!!、角色出場、攻擊與 Counter','本機練習進度儲存及對戰操作紀錄']},
+   {version:'14.3',date:'2026-11-24',status:'個人戰績',title:'先後手、換手與前六回合紀錄',changes:['個人對戰日誌、勝負統計、首後手比較','可輸入實際前六回合出牌量，不捏造缺少資料的數值']},
+   {version:'14.2',date:'2026-11-24',status:'對戰配對分析',title:'可匯入 Limitless standings / pairings',changes:['僅計算雙方 Leader 與勝方可核對的完整配對','來源匯入與個人戰績分離，未經獨立驗證時明確標示']},
+   {version:'14.1',date:'2026-11-24',status:'熱門構築',title:'Leaderboard 卡牌採用率',changes:['同 Leader 公開完整牌組的卡牌採用率','與現有牌組比較、保留樣本數及偏差警告']}
+  ];
+  if(Array.isArray(history))for(const v of versions.slice().reverse())if(!history.some(x=>x.version===v.version))history.unshift(v);
+  const list=document.getElementById('versionList');if(!list||list.querySelector('[data-v151-release]'))return;
+  for(const old of list.querySelectorAll('.releaseRow strong'))old.textContent=old.textContent.replace(' · 目前版本','');
+  const frag=document.createDocumentFragment();for(const v of versions){const el=document.createElement('article');el.className='releaseEntry';el.dataset.v151Release='true';
+   el.innerHTML='<div class="releaseRow"><strong>v'+v.version+(v.version==='15.1'?' · 目前版本':'')+'</strong><small>'+v.date+' · '+v.status+'</small></div><h3>'+v.title+'</h3><ul>'+v.changes.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
+   frag.appendChild(el);
+  }list.prepend(frag);
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',update);else update();
+})();
+</script>
 </body>
 </html>
